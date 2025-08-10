@@ -1,0 +1,269 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class ForgotPasswordOtpScreen extends StatefulWidget {
+  const ForgotPasswordOtpScreen({super.key});
+
+  @override
+  State<ForgotPasswordOtpScreen> createState() => _ForgotPasswordOtpScreenState();
+}
+
+class _ForgotPasswordOtpScreenState extends State<ForgotPasswordOtpScreen> {
+  final List<TextEditingController> _otpControllers = List.generate(4, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  
+  String? _email;
+  int _resendSeconds = 30;
+  Timer? _timer;
+  bool _isOtpValid = true;
+  bool _isOtpCorrect = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Extract email from arguments if available
+    if (Get.arguments != null && Get.arguments is Map) {
+      _email = Get.arguments['email'] as String?;
+    }
+    _startResendTimer();
+    
+    // Set up focus listeners for OTP fields
+    for (int i = 0; i < 4; i++) {
+      _focusNodes[i].addListener(() {
+        if (_focusNodes[i].hasFocus && _otpControllers[i].text.isNotEmpty) {
+          _otpControllers[i].selection = TextSelection(baseOffset: 0, extentOffset: _otpControllers[i].text.length);
+        }
+      });
+    }
+  }
+  
+  @override
+  void dispose() {
+    for (var controller in _otpControllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
+    _timer?.cancel();
+    super.dispose();
+  }
+  
+  void _startResendTimer() {
+    _timer?.cancel();
+    _resendSeconds = 30;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendSeconds > 0) {
+        setState(() {
+          _resendSeconds--;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  void _resendCode() {
+    if (_resendSeconds == 0) {
+      // TODO: Implement resend code logic
+      _startResendTimer();
+    }
+  }
+  
+  void _verifyOtp() {
+    // Collect OTP digits
+    final otp = _otpControllers.map((controller) => controller.text).join();
+    
+    setState(() {
+      // Simulate that "1234" is the correct PIN
+      if (otp == "1234") {
+        _isOtpValid = true;
+        _isOtpCorrect = true;
+        
+        // Wait a moment to show the green borders before navigating
+        Future.delayed(const Duration(milliseconds: 500), () {
+          // Navigate to create new password screen
+          Get.toNamed('/create-new-password');
+        });
+      } else if (otp.length == 4) {
+        _isOtpValid = false;
+        _isOtpCorrect = false;
+        
+        // Clear the fields after a short delay
+        Future.delayed(const Duration(seconds: 1), () {
+          setState(() {
+            // Clear the fields for retry
+            for (var controller in _otpControllers) {
+              controller.clear();
+            }
+            // Reset validation state
+            _isOtpValid = true;
+            // Focus on first field again
+            _focusNodes[0].requestFocus();
+          });
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 19.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Back button
+               Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Get.back(),
+                        ),
+                      ),
+                      
+                      Spacer(),
+                      
+                      // Logo
+                      Text(
+                                      'INKSTRYQ',
+                                      style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                      fontSize: 20
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                    Spacer(), Spacer(),
+                    ],
+
+                  ),
+                
+                const SizedBox(height: 40.0),
+                
+                // Title
+                Text(
+                  'Enter the code',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 22,
+                    fontFamily: GoogleFonts.inter().fontFamily,
+                    color: Color(0xFF161515),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                const SizedBox(height: 16.0),
+                
+                // Email info
+                Text(
+                  'A code was sent to ${_email ?? "your email"}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 16,
+                    color: const Color(0xFF4A4A4A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
+                const SizedBox(height: 48.0),
+                
+                // OTP Input Fields
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(4, (index) {
+                    return Container(
+                      width: 60,
+                      height: 60,
+                      margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8.0),
+                        border: Border.all(
+                          color: !_isOtpValid 
+                              ? const Color.fromARGB(255, 245, 117, 117) 
+                              : _isOtpCorrect 
+                                  ? const Color(0xFF57C696) 
+                                  : const Color(0xFFE8E8E8),
+                          width: !_isOtpValid || _isOtpCorrect ? 2.0 : 1.0,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _otpControllers[index],
+                        focusNode: _focusNodes[index],
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        maxLength: 1,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                          fontFamily: GoogleFonts.inter().fontFamily,
+                        ),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        onChanged: (value) {
+                          if (value.isNotEmpty) {
+                            // Auto-advance to next field
+                            if (index < 3) {
+                              _focusNodes[index + 1].requestFocus();
+                            } else {
+                              // Last field filled, verify OTP
+                              _focusNodes[index].unfocus();
+                              _verifyOtp();
+                            }
+                          } else if (index > 0) {
+                            // Auto-move to previous field on backspace
+                            _focusNodes[index - 1].requestFocus();
+                          }
+                        },
+                      ),
+                    );
+                  }),
+                ),
+                
+                const SizedBox(height: 24.0),
+                
+                // Resend code timer
+                Center(
+                  child: TextButton(
+                    onPressed: _resendSeconds == 0 ? _resendCode : null,
+                    child: Text(
+                      _resendSeconds > 0 
+                          ? 'Resend code in $_resendSeconds' 
+                          : 'Resend code',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: _resendSeconds > 0 
+                            ? const Color(0xFF6B7280) 
+                            : const Color(0xFF5796FF),
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
