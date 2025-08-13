@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
-import 'package:inkstryq/pages/academic_details_flow/add_institution_screen.dart';
+import 'package:inkstryq/pages/feed/feed_screen.dart';
+import 'package:inkstryq/pages/onboarding/academic_details_screen.dart';
 import 'package:inkstryq/pages/auth/create_account_flow/create_account_screen.dart';
 import 'package:inkstryq/pages/auth/create_account_flow/create_account_otp_screen.dart';
 import 'package:inkstryq/pages/auth/forgot_password_flow/create_new_password_screen.dart';
@@ -57,7 +58,11 @@ class AppPages {
     ),
     GetPage(
       name: '/academic-details',
-      page: () => const AddInstitutionScreen(),
+      page: () => const AcademicDetailsScreen(),
+    ),
+    GetPage(
+      name: '/feed',
+      page: () => const FeedScreen(),
     ),
   ];
 }
