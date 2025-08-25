@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../controllers/auth_controller.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -10,6 +11,7 @@ class CreateAccountScreen extends StatefulWidget {
 }
 
 class _CreateAccountScreenState extends State<CreateAccountScreen> {
+  final AuthController _authController = Get.find<AuthController>();
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -62,17 +64,38 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     });
   }
   
-  void _signUp() {
+  void _signUp() async {
     if (_formKey.currentState!.validate() &&
         _hasMinLength &&
         _hasUpperAndLowerCase &&
         _hasNumberOrSpecialChar &&
         _notContainsEmail &&
         _notCommonlyUsed) {
-      // Navigate to account creation OTP verification
-      Get.toNamed('/create-account-otp', arguments: {'email': _emailController.text});
+      
+      // Call the auth controller to initiate signup
+      final success = await _authController.initiateSignup(
+        _nameController.text,
+        _emailController.text,
+        _passwordController.text
+      );
+      
+      if (success) {
+        // Navigate to account creation OTP verification
+        Get.toNamed('/create-account-otp', arguments: {'email': _emailController.text});
+      } else {
+        // Show error message
+        Get.snackbar(
+          'Error',
+          _authController.errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          margin: const EdgeInsets.all(16),
+        );
+      }
     }
   }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -341,8 +364,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   const SizedBox(height: 32),
                   
                   // Sign Up Button
-                  ElevatedButton(
-                    onPressed: _signUp,
+                  Obx(() => ElevatedButton(
+                    onPressed: _authController.isInitiatingSignup.value ? null : _signUp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF5796FF),
                       foregroundColor: Colors.white,
@@ -352,15 +375,24 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       minimumSize: const Size(double.infinity, 50),
                     ),
-                    child: Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: GoogleFonts.inter().fontFamily,
-                      ),
-                    ),
-                  ),
+                    child: _authController.isInitiatingSignup.value
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: GoogleFonts.inter().fontFamily,
+                          ),
+                        ),
+                  )),
                   
                   const SizedBox(height: 24),
                 ],

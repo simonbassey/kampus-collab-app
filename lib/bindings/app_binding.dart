@@ -1,10 +1,14 @@
 import 'package:get/get.dart';
+import '../controllers/auth_controller.dart';
+import '../services/auth_service.dart';
 
 class AppBinding extends Bindings {
   @override
   void dependencies() {
-    // Initialize your controllers and dependencies here
-    // Example:
-    // Get.lazyPut<YourController>(() => YourController());
+    // Register services first
+    Get.lazyPut<AuthService>(() => AuthService());
+    
+    // Then register controllers that depend on services
+    Get.lazyPut<AuthController>(() => AuthController());
   }
 }

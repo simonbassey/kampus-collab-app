@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import '../../../controllers/auth_controller.dart';
 
 class CreateAccountOtpScreen extends StatefulWidget {
   const CreateAccountOtpScreen({super.key});
@@ -12,8 +13,9 @@ class CreateAccountOtpScreen extends StatefulWidget {
 }
 
 class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
-  final List<TextEditingController> _otpControllers = List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  final AuthController _authController = Get.find<AuthController>();
+  final List<TextEditingController> _otpControllers = List.generate(5, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(5, (_) => FocusNode());
   
   String? _email;
   int _resendSeconds = 30;
@@ -32,7 +34,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
     }
     
     // Set up focus node listeners for auto-advance
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
       _focusNodes[i].addListener(() {
         if (_focusNodes[i].hasFocus && _otpControllers[i].text.isNotEmpty) {
           _focusNodes[i + 1].requestFocus();
@@ -67,31 +69,76 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
     });
   }
   
-  void _resendCode() {
+  void _resendCode() async {
     if (_resendSeconds == 0) {
-      // TODO: Implement resend code logic
+      final result = await _authController.resendOtp();
+      if (result) {
+        Get.snackbar(
+          'Success',
+          'OTP code has been resent to your email',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          margin: const EdgeInsets.all(16),
+        );
+      } else {
+        Get.snackbar(
+          'Error',
+          _authController.errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          margin: const EdgeInsets.all(16),
+        );
+      }
       _startResendTimer();
     }
   }
   
-  void _verifyOtp() {
+  void _verifyOtp() async {
     // Collect OTP digits
     final otp = _otpControllers.map((controller) => controller.text).join();
     
-    setState(() {
-      // Simulate that "1234" is the correct PIN
-      if (otp == "1234") {
-        _isOtpValid = true;
-        _isOtpCorrect = true;
+    if (otp.length == 5) {
+      // Call the auth controller to complete signup with OTP
+      final success = await _authController.completeSignup(otp);
+      
+      if (success) {
+        setState(() {
+          _isOtpValid = true;
+          _isOtpCorrect = true;
+        });
+        
+        // Show success message
+        Get.snackbar(
+          'Success',
+          'Account created successfully!',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          margin: const EdgeInsets.all(16),
+        );
         
         // Wait a moment to show the green borders before navigating
-        Future.delayed(const Duration(milliseconds: 500), () {
+        Future.delayed(const Duration(milliseconds: 1000), () {
           // Navigate to success screen or home screen
           Get.offAllNamed('/academic-details');
         });
-      } else if (otp.length == 4) {
-        _isOtpValid = false;
-        _isOtpCorrect = false;
+      } else {
+        setState(() {
+          _isOtpValid = false;
+          _isOtpCorrect = false;
+        });
+        
+        // Show error message
+        Get.snackbar(
+          'Error',
+          _authController.errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          margin: const EdgeInsets.all(16),
+        );
         
         // Clear the fields after a short delay
         Future.delayed(const Duration(seconds: 1), () {
@@ -107,8 +154,9 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
           });
         });
       }
-    });
+    }
   }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -178,11 +226,11 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                 // OTP Input Fields
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(4, (index) {
+                  children: List.generate(5, (index) {
                     return Container(
-                      width: 60,
+                      width: 50,
                       height: 60,
-                      margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                      margin: const EdgeInsets.symmetric(horizontal: 4.0),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8.0),
@@ -216,7 +264,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                         onChanged: (value) {
                           if (value.isNotEmpty) {
                             // Auto-advance to next field
-                            if (index < 3) {
+                            if (index < 4) {
                               _focusNodes[index + 1].requestFocus();
                             } else {
                               // Last field filled, verify OTP
@@ -235,25 +283,81 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                 const SizedBox(height: 32.0),
                 
                 // Resend code timer/button
-                GestureDetector(
-                  onTap: _resendCode,
-                  child: Text(
-                    _resendSeconds > 0
-                        ? 'Resend code in $_resendSeconds'
-                        : 'Resend code',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: _resendSeconds > 0
-                          ? Colors.grey
-                          : const Color(0xFF5796FF),
-                      fontFamily: GoogleFonts.inter().fontFamily,
-                    ),
-                  ),
-                ),
+                Obx(() => GestureDetector(
+                  onTap: (_resendSeconds > 0 || _authController.isResendingOtp.value) ? null : _resendCode,
+                  child: _authController.isResendingOtp.value
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: const Color(0xFF5796FF),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Resending...',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF5796FF),
+                              fontFamily: GoogleFonts.inter().fontFamily,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        _resendSeconds > 0
+                            ? 'Resend code in $_resendSeconds'
+                            : 'Resend code',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: _resendSeconds > 0
+                              ? Colors.grey
+                              : const Color(0xFF5796FF),
+                          fontFamily: GoogleFonts.inter().fontFamily,
+                        ),
+                      ),
+                )),
                 
                 const SizedBox(height: 40.0),
                 
+                // Verify Button
+                Obx(() => ElevatedButton(
+                  onPressed: _authController.isCompletingSignup.value ? null : _verifyOtp,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5796FF),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  child: _authController.isCompletingSignup.value
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        'Verify',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: GoogleFonts.inter().fontFamily,
+                        ),
+                      ),
+                )),
+                
+                const SizedBox(height: 20.0),
               ],
             ),
           ),
