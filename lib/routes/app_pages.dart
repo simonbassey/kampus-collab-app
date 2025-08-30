@@ -7,6 +7,8 @@ import 'package:inkstryq/pages/auth/forgot_password_flow/create_new_password_scr
 import 'package:inkstryq/pages/auth/forgot_password_flow/forgot_password_otp_screen.dart';
 import 'package:inkstryq/pages/auth/forgot_password_flow/forgot_password_screen.dart';
 import 'package:inkstryq/pages/auth/forgot_password_flow/password_reset_success_screen.dart';
+import 'package:inkstryq/pages/profile/profile_setup_screen.dart';
+import 'package:inkstryq/pages/profile/profile_page.dart';
 import '../pages/splash_screen.dart';
 import '../pages/first_screen.dart';
 import '../pages/auth/login_screen.dart';
@@ -63,6 +65,14 @@ class AppPages {
     GetPage(
       name: '/feed',
       page: () => const FeedScreen(),
+    ),
+    GetPage(
+      name: '/profile-setup',
+      page: () => const ProfileSetupScreen(),
+    ),
+    GetPage(
+      name: '/profile',
+      page: () => const ProfilePage(),
     ),
   ];
 }
