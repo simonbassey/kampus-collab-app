@@ -31,6 +31,26 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
     // Get email from arguments if available
     if (Get.arguments != null && Get.arguments['email'] != null) {
       _email = Get.arguments['email'];
+      
+      // Store the email in the controller for further API calls
+      _authController.currentEmail.value = _email!;
+      
+      // Automatically trigger OTP resend for unverified accounts coming from login
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Trigger OTP resend and show notification
+        _authController.resendOtp().then((success) {
+          Get.snackbar(
+            success ? 'Code Sent' : 'Error',
+            success 
+              ? 'A verification code has been sent to your email'
+              : 'Failed to send verification code. Try using the resend button.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: success ? Colors.blue[100] : Colors.red[100],
+            colorText: success ? Colors.blue[900] : Colors.red[900],
+            margin: const EdgeInsets.all(16),
+          );
+        });
+      });
     }
     
     // Set up focus node listeners for auto-advance
@@ -109,6 +129,21 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
           _isOtpCorrect = true;
         });
         
+        // Verify token is available from auth controller
+        final authToken = await _authController.getAuthToken();
+        if (authToken == null || authToken.isEmpty) {
+          // Token wasn't saved properly
+          Get.snackbar(
+            'Error',
+            'Failed to save authentication token. Please try again.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red[100],
+            colorText: Colors.red[900],
+            margin: const EdgeInsets.all(16),
+          );
+          return;
+        }
+        
         // Show success message
         Get.snackbar(
           'Success',
@@ -121,8 +156,8 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
         
         // Wait a moment to show the green borders before navigating
         Future.delayed(const Duration(milliseconds: 1000), () {
-          // Navigate to success screen or home screen
-          Get.offAllNamed('/academic-details');
+          // Navigate to success screen or home screen with token
+          Get.offAllNamed('/academic-details', arguments: {'token': authToken});
         });
       } else {
         setState(() {
@@ -217,6 +252,16 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                     fontWeight: FontWeight.w400,
                     fontSize: 16,
                     color: const Color(0xFF4A4A4A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                // Email info
+                Text(
+                  'Check your spam mail just also',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: const Color(0xFF5796FF),
                   ),
                   textAlign: TextAlign.center,
                 ),

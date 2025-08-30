@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../controllers/auth_controller.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,10 +39,24 @@ class SplashScreenState extends State<SplashScreen> with SingleTickerProviderSta
 
     _controller.forward();
 
-    // Navigate to the first screen after the animation completes
-    Future.delayed(const Duration(seconds: 5), () {
-      Get.offAllNamed('/first');
+    // Check authentication status after a delay to show splash animation
+    Future.delayed(const Duration(seconds: 3), () {
+      _checkAuthAndNavigate();
     });
+  }
+
+  // Check if user is authenticated and navigate to appropriate screen
+  void _checkAuthAndNavigate() async {
+    final AuthController authController = Get.find<AuthController>();
+    await authController.checkAuthStatus();
+    
+    if (authController.isAuthenticated.value) {
+      // User is authenticated, go to feed screen
+      Get.offAllNamed('/feed');
+    } else {
+      // User is not authenticated, go to first/onboarding screen
+      Get.offAllNamed('/first');
+    }
   }
 
   @override

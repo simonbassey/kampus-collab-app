@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../controllers/auth_controller.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
+  final AuthController _authController = Get.find<AuthController>();
 
   @override
   void dispose() {
@@ -23,9 +25,31 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
-    // TODO: Implement login logic
-    print('Login with: ${_emailController.text}');
+  void _login() async {
+    if (_formKey.currentState!.validate()) {
+      final result = await _authController.login(
+        _emailController.text.trim(),
+        _passwordController.text
+      );
+      
+      if (result['success']) {
+        // Navigate to feed page
+        Get.offAllNamed('/feed');
+      } else if (result['needsVerification'] == true) {
+        // Navigate to OTP verification screen
+        Get.toNamed('/create-account-otp', arguments: {'email': result['email']});
+      } else {
+        // Show error message
+        Get.snackbar(
+          'Error',
+          _authController.errorMessage.value,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red[100],
+          colorText: Colors.red[900],
+          margin: const EdgeInsets.all(16),
+        );
+      }
+    }
   }
 
   @override
@@ -288,8 +312,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 32.0),
                   
                   // Login Button
-                  ElevatedButton(
-                    onPressed: () {
+                  Obx(() => ElevatedButton(
+                    onPressed: _authController.isLoggingIn.value ? null : () {
                       if (_formKey.currentState!.validate()) {
                         _login();
                       }
@@ -301,16 +325,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       backgroundColor: const Color(0xFF5796FF),
                     ),
-                    child: Text(
-                      'Login',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
-                        fontFamily: GoogleFonts.inter().fontFamily,
-                      ),
-                    ),
-                  ),
+                    child: _authController.isLoggingIn.value
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Login',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontSize: 16.0,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                            fontFamily: GoogleFonts.inter().fontFamily,
+                          ),
+                        ),
+                  )),
                   
                   const SizedBox(height: 16.0),
                   
