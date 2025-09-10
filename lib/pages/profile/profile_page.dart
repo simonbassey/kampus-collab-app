@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../../controllers/student_profile_controller.dart';
+import '../../controllers/auth_controller.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,9 +14,10 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
-  // Get the student profile controller
+  // Get the controllers
   final StudentProfileController _profileController =
       Get.find<StudentProfileController>();
+  final AuthController _authController = Get.find<AuthController>();
   late TabController _tabController;
 
   @override
@@ -31,6 +33,89 @@ class _ProfilePageState extends State<ProfilePage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  // Show logout confirmation dialog
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: const Text(
+            'Logout',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontFamily: 'Monda',
+            ),
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(fontSize: 16, fontFamily: 'Inter'),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // Close the dialog
+                  },
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(dialogContext).pop(); // Close the dialog
+
+                    // Show loading indicator
+                    Get.dialog(
+                      const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF5796FF),
+                        ),
+                      ),
+                      barrierDismissible: false,
+                    );
+
+                    // Perform logout
+                    await _authController.logout();
+
+                    // Close loading indicator and navigate to login page
+                    Get.back();
+                    Get.offAllNamed('/login'); // Navigate to login page
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5796FF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -63,19 +148,91 @@ class _ProfilePageState extends State<ProfilePage>
         ),
 
         actions: [
-          TextButton(
-            onPressed: () => Get.toNamed('/profile-setup'),
-            child: Text(
-              'Edit profile',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w500,
-                fontStyle: FontStyle.normal,
-                fontSize: 14,
-                letterSpacing: -0.41,
-                color: Color(0xff333333),
-              ),
-            ),
+          PopupMenuButton<String>(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+            elevation: 1,
+            color: Color(0xffF9FAFB),
+            icon: const Icon(Icons.more_vert, color: Color(0xff333333)),
+            onSelected: (value) {
+              if (value == 'edit') {
+                Get.toNamed('/profile-setup');
+              } else if (value == 'logout') {
+                _showLogoutConfirmation(context);
+              } else if (value == 'start-live') {
+                Get.toNamed('/live-session');
+              }
+            },
+            itemBuilder:
+                (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_square,
+                          color: Color(0xff333333),
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Edit Profile',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 16,
+                            letterSpacing: 0,
+                            color: Color(0xff333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'start-live',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.video_call,
+                          color: Color(0xff333333),
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Start Live Session',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 16,
+                            letterSpacing: 0,
+                            color: Color(0xff333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, color: Color(0xff333333), size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 16,
+                            letterSpacing: 0,
+                            color: Color(0xff333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
           ),
         ],
       ),

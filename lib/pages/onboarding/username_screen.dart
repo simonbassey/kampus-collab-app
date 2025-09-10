@@ -25,12 +25,14 @@ class _UsernameScreenState extends State<UsernameScreen> {
       setState(() {
         _isLoading = true;
       });
-      
+
       // Simulate a short delay before navigation
       Future.delayed(const Duration(milliseconds: 800), () {
         // Navigate to feed route
-        Get.offAllNamed('/feed'); // Using offAllNamed to clear the navigation stack
-        
+        Get.offAllNamed(
+          '/feed',
+        ); // Using offAllNamed to clear the navigation stack
+
         // Reset loading state if the screen is still mounted
         if (mounted) {
           setState(() {
@@ -44,13 +46,16 @@ class _UsernameScreenState extends State<UsernameScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 19.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 19.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -62,13 +67,13 @@ class _UsernameScreenState extends State<UsernameScreen> {
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.5,
-                      fontSize: 20
+                      fontSize: 20,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  
+
                   const SizedBox(height: 40.0),
-                  
+
                   // Username Title
                   Text(
                     'Username',
@@ -80,9 +85,9 @@ class _UsernameScreenState extends State<UsernameScreen> {
                     ),
                     textAlign: TextAlign.left,
                   ),
-                  
+
                   const SizedBox(height: 32.0),
-                  
+
                   // Username Field
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,9 +171,9 @@ class _UsernameScreenState extends State<UsernameScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 60.0),
-                  
+
                   // Continue Button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _continueToFeed,
@@ -179,24 +184,27 @@ class _UsernameScreenState extends State<UsernameScreen> {
                       ),
                       backgroundColor: const Color(0xFF5796FF),
                     ),
-                    child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          'Continue',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontSize: 16.0,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                            fontFamily: GoogleFonts.inter().fontFamily,
-                          ),
-                        ),
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                            : Text(
+                              'Continue',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontSize: 16.0,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                                fontFamily: GoogleFonts.inter().fontFamily,
+                              ),
+                            ),
                   ),
                 ],
               ),
