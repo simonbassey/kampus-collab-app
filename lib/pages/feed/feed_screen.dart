@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:inkstryq/widgets/custom_bottom_navbar.dart';
 import '_widgets/feed_app_bar.dart';
 import '_widgets/profile_setup_modal.dart';
 
@@ -24,6 +25,10 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 0,
+        onTap: (index) {},
+      ),
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(

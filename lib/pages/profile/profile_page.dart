@@ -160,6 +160,8 @@ class _ProfilePageState extends State<ProfilePage>
                 _showLogoutConfirmation(context);
               } else if (value == 'start-live') {
                 Get.toNamed('/live-session');
+              } else if (value == 'settings') {
+                Get.toNamed('/settings');
               }
             },
             itemBuilder:
@@ -220,6 +222,30 @@ class _ProfilePageState extends State<ProfilePage>
                         SizedBox(width: 8),
                         Text(
                           'Logout',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 16,
+                            letterSpacing: 0,
+                            color: Color(0xff333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'settings',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.settings_outlined,
+                          color: Color(0xff333333),
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Settings',
                           style: TextStyle(
                             fontFamily: 'Inter',
                             fontWeight: FontWeight.w500,

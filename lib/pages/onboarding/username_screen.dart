@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../controllers/student_profile_controller.dart';
 
 class UsernameScreen extends StatefulWidget {
   const UsernameScreen({super.key});
@@ -12,34 +13,76 @@ class UsernameScreen extends StatefulWidget {
 class _UsernameScreenState extends State<UsernameScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
+  final StudentProfileController _profileController = Get.find<StudentProfileController>();
   bool _isLoading = false;
+  
+  // Academic details passed from previous screen
+  late final int _institutionId;
+  late final int _programId;
+  late final String _level;
 
+  @override
+  void initState() {
+    super.initState();
+    // Get the arguments passed from the AcademicDetailsScreen
+    final Map<String, dynamic>? args = Get.arguments;
+    if (args != null) {
+      _institutionId = args['institutionId'] as int;
+      _programId = args['programId'] as int;
+      _level = args['level'] as String;
+    } else {
+      // Fallback values in case no args are provided (shouldn't happen in normal flow)
+      _institutionId = 1;
+      _programId = 1;
+      _level = '100 LEVEL';
+    }
+  }
+  
   @override
   void dispose() {
     _usernameController.dispose();
     super.dispose();
   }
 
-  void _continueToFeed() {
+  void _continueToFeed() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
-
-      // Simulate a short delay before navigation
-      Future.delayed(const Duration(milliseconds: 800), () {
-        // Navigate to feed route
-        Get.offAllNamed(
-          '/feed',
-        ); // Using offAllNamed to clear the navigation stack
-
+      
+      try {
+        // Get the year of study from the level string (e.g., "100 LEVEL" -> 1)
+        final int yearOfStudy = int.parse(_level.split(' ')[0]) ~/ 100;
+        
+        // Update the academic details in the profile
+        final success = await _profileController.updateAcademicDetails(
+          institutionId: _institutionId,
+          departmentOrProgramId: _programId,
+          facultyOrDisciplineId: 1, // Default faculty ID, could be fetched if available
+          yearOfStudy: yearOfStudy,
+        );
+        
+        if (success) {
+          // Navigate to feed route
+          Get.offAllNamed('/feed'); // Using offAllNamed to clear the navigation stack
+        } else {
+          // Show error if update failed
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update academic details: ${_profileController.error.value}'))
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}'))
+        );
+      } finally {
         // Reset loading state if the screen is still mounted
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
         }
-      });
+      }
     }
   }
 
