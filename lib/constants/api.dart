@@ -34,6 +34,11 @@ class ApiConstants {
   static const String updateStudentProfile = '$apiPrefix/StudentProfiles/update/{id}';
   static const String deleteStudentProfile = '$apiPrefix/StudentProfiles/delete/{id}';
   
+  // New Profile endpoints
+  static const String getCurrentUserProfile = '$apiPrefix/profile/me';
+  static const String getUserProfileById = '$apiPrefix/profile/{userId}';
+  static const String updateAcademicProfile = '$apiPrefix/profile/update/academic';
+  
   // Institution endpoints
   static const String createInstitution = '$apiPrefix/institutions/create';
   static const String getInstitutionById = '$apiPrefix/institutions/{id}';

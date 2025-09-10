@@ -67,7 +67,14 @@ class _ProfilePageState extends State<ProfilePage>
             onPressed: () => Get.toNamed('/profile-setup'),
             child: Text(
               'Edit profile',
-              style: TextStyle(color: Color(0xff4A4A4A)),
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w500,
+                fontStyle: FontStyle.normal,
+                fontSize: 14,
+                letterSpacing: -0.41,
+                color: Color(0xff333333),
+              ),
             ),
           ),
         ],

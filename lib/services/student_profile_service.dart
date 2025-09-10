@@ -21,54 +21,78 @@ class StudentProfileService {
     try {
       print('Creating profile with data: ${jsonEncode(profile.toJson())}');
       
-      // Wrap the profile data in a 'dto' field as required by the API
-      final Map<String, dynamic> requestBody = {
+      // Try several request formats to find one that works
+      // Attempt 1: With 'dto' wrapper as originally implemented
+      final Map<String, dynamic> requestBody1 = {
         'dto': profile.toJson()
       };
       
-      print('Request body: ${jsonEncode(requestBody)}');
+      print('Attempt 1 - Request body with dto wrapper: ${jsonEncode(requestBody1)}');
       
       // Use the API constant instead of hardcoded URL
-      final response = await http.post(
+      final response1 = await http.post(
         Uri.parse(ApiConstants.createStudentProfile),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(requestBody),
+        body: jsonEncode(requestBody1),
       );
       
-      // Try different content types if server 500 error persists
-      if (response.statusCode == 500) {
-        print('Trying with different Content-Type header...');
-        final retryResponse = await http.post(
-          Uri.parse(ApiConstants.createStudentProfile),
-          headers: {
-            'Content-Type': 'application/json-patch+json',
-            if (token != null) 'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode(requestBody),
-        );
-        
-        if (retryResponse.statusCode != 500) {
-          print('Alternative Content-Type successful with status: ${retryResponse.statusCode}');
-          return StudentProfileModel.fromJson(jsonDecode(retryResponse.body));
+      print('Attempt 1 status code: ${response1.statusCode}');
+      if (response1.statusCode == 200 || response1.statusCode == 201) {
+        if (response1.body.isNotEmpty) {
+          return StudentProfileModel.fromJson(jsonDecode(response1.body));
+        }
+      }
+      
+      // Attempt 2: Without the 'dto' wrapper - directly send the profile object
+      print('Attempt 2 - Request body without dto wrapper: ${jsonEncode(profile.toJson())}');
+      final response2 = await http.post(
+        Uri.parse(ApiConstants.createStudentProfile),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(profile.toJson()),
+      );
+      
+      print('Attempt 2 status code: ${response2.statusCode}');
+      if (response2.statusCode == 200 || response2.statusCode == 201) {
+        if (response2.body.isNotEmpty) {
+          return StudentProfileModel.fromJson(jsonDecode(response2.body));
+        }
+      }
+      
+      // Attempt 3: Use JSON-Patch content type
+      final response3 = await http.post(
+        Uri.parse(ApiConstants.createStudentProfile),
+        headers: {
+          'Content-Type': 'application/json-patch+json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(profile.toJson()),
+      );
+      
+      print('Attempt 3 status code: ${response3.statusCode}');
+      if (response3.statusCode == 200 || response3.statusCode == 201) {
+        if (response3.body.isNotEmpty) {
+          return StudentProfileModel.fromJson(jsonDecode(response3.body));
         }
       }
 
-      print('API Response Status Code: ${response.statusCode}');
-      print('API Response Headers: ${response.headers}');
-      print('API Raw Response Body: "${response.body}"');
+      // If all attempts fail, use the last response for error reporting
+      print('All attempts failed');
+      print('API Response Status Code: ${response3.statusCode}');
+      print('API Response Headers: ${response3.headers}');
+      print('API Raw Response Body: "${response3.body}"');
       
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (response.body.isNotEmpty) {
-          return StudentProfileModel.fromJson(jsonDecode(response.body));
-        } else {
-          // Handle empty response
-          throw Exception('Server returned empty response with status code ${response.statusCode}');
-        }
+      // If we get here, all attempts failed
+      if (response3.body.isNotEmpty) {
+        throw Exception('Failed to create profile: ${response3.body}');
       } else {
-        throw Exception('Failed to create profile: ${response.body}');
+        // Handle empty response
+        throw Exception('Server returned empty response with status code ${response3.statusCode}');
       }
     } catch (e) {
       print('Exception during profile creation: $e');
@@ -96,17 +120,14 @@ class StudentProfileService {
     }
   }
 
-  // Get all student profiles
+  // Get all student profiles - legacy method
   Future<List<StudentProfileModel>> getAllProfiles() async {
-    print('Fetching profiles from: $baseUrl/api/StudentProfiles/all');
+    print('Fetching profiles from: ${ApiConstants.getAllStudentProfiles}');
     
     try {
       // Get the auth token
       final token = await getAuthToken();
       print('Auth token: ${token != null ? 'Present' : 'Not found'}');
-      if (token != null) {
-        print('Token value: $token');
-      }
       
       final headers = {
         'Content-Type': 'application/json',
@@ -116,13 +137,12 @@ class StudentProfileService {
       print('Request headers: $headers');
       
       final response = await http.get(
-        Uri.parse('$baseUrl/api/StudentProfiles/all'),
+        Uri.parse(ApiConstants.getAllStudentProfiles),
         headers: headers,
       );
 
       print('API Response Status Code: ${response.statusCode}');
-      print('API Response Headers: ${response.headers}');
-      print('API Raw Response Body: "${response.body}"');
+      print('API Response Body Length: ${response.body.length}');
 
       if (response.statusCode == 200) {
         if (response.body.isNotEmpty) {
@@ -141,6 +161,76 @@ class StudentProfileService {
       }
     } catch (e) {
       print('Exception during API call: $e');
+      rethrow;
+    }
+  }
+  
+  // Get the current user's profile using the new endpoint
+  Future<StudentProfileModel> getCurrentUserProfile() async {
+    print('Fetching current user profile from: ${ApiConstants.getCurrentUserProfile}');
+    
+    try {
+      final token = await getAuthToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+      
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+      
+      final response = await http.get(
+        Uri.parse(ApiConstants.getCurrentUserProfile),
+        headers: headers,
+      );
+
+      print('API Response Status Code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        if (response.body.isNotEmpty) {
+          return StudentProfileModel.fromJson(jsonDecode(response.body));
+        } else {
+          throw Exception('Empty response received from server');
+        }
+      } else {
+        throw Exception('Failed to load current user profile: ${response.body}');
+      }
+    } catch (e) {
+      print('Exception fetching current user profile: $e');
+      rethrow;
+    }
+  }
+  
+  // Get a user's public profile by userId
+  Future<StudentProfileModel> getUserProfileById(String userId) async {
+    final endpoint = ApiConstants.getUserProfileById.replaceAll('{userId}', userId);
+    print('Fetching user profile from: $endpoint');
+    
+    try {
+      final token = await getAuthToken();
+      
+      final headers = {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+      
+      final response = await http.get(
+        Uri.parse(endpoint),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        if (response.body.isNotEmpty) {
+          return StudentProfileModel.fromJson(jsonDecode(response.body));
+        } else {
+          throw Exception('Empty response received from server');
+        }
+      } else {
+        throw Exception('Failed to load user profile: ${response.body}');
+      }
+    } catch (e) {
+      print('Exception fetching user profile: $e');
       rethrow;
     }
   }
@@ -186,6 +276,56 @@ class StudentProfileService {
       return true;
     } else {
       throw Exception('Failed to delete profile: ${response.body}');
+    }
+  }
+  
+  // Update academic profile details (institution, course, year of study)
+  Future<StudentProfileModel> updateAcademicProfile({
+    required int institutionId,
+    required int departmentOrProgramId,
+    required int facultyOrDisciplineId,
+    required int yearOfStudy,
+  }) async {
+    print('Updating academic profile with data: institutionId=$institutionId, programId=$departmentOrProgramId, facultyId=$facultyOrDisciplineId, yearOfStudy=$yearOfStudy');
+    
+    try {
+      final token = await getAuthToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+      
+      final Map<String, dynamic> requestBody = {
+        'institutionId': institutionId,
+        'departmentOrProgramId': departmentOrProgramId,
+        'facultyOrDisciplineId': facultyOrDisciplineId,
+        'yearOfStudy': yearOfStudy,
+      };
+      
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+      
+      final response = await http.post(
+        Uri.parse(ApiConstants.updateAcademicProfile),
+        headers: headers,
+        body: jsonEncode(requestBody),
+      );
+
+      print('API Response Status Code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        if (response.body.isNotEmpty) {
+          return StudentProfileModel.fromJson(jsonDecode(response.body));
+        } else {
+          throw Exception('Empty response received from server');
+        }
+      } else {
+        throw Exception('Failed to update academic profile: ${response.body}');
+      }
+    } catch (e) {
+      print('Exception updating academic profile: $e');
+      rethrow;
     }
   }
 }

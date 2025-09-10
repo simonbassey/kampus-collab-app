@@ -15,6 +15,7 @@ class AppBinding extends Bindings {
     Get.put<AuthController>(AuthController());
     
     // Then register StudentProfileController that depends on AuthController
-    Get.lazyPut<StudentProfileController>(() => StudentProfileController());
+    // Using Get.put instead of Get.lazyPut to ensure it's immediately available
+    Get.put<StudentProfileController>(StudentProfileController());
   }
 }

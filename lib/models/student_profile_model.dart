@@ -1,5 +1,6 @@
 class StudentProfileModel {
   final String? userId;
+  final String? fullName;
   final int? institutionId;
   final String? identityCardBase64;
   final String? identityNumber;
@@ -13,6 +14,7 @@ class StudentProfileModel {
 
   StudentProfileModel({
     this.userId,
+    this.fullName,
     this.institutionId,
     this.identityCardBase64,
     this.identityNumber,
@@ -28,6 +30,7 @@ class StudentProfileModel {
   factory StudentProfileModel.fromJson(Map<String, dynamic> json) {
     return StudentProfileModel(
       userId: json['userId'],
+      fullName: json['fullName'],
       institutionId: json['institutionId'],
       identityCardBase64: json['identityCardBase64'],
       identityNumber: json['identityNumber'],
@@ -44,6 +47,7 @@ class StudentProfileModel {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'userId': userId,
+      'fullName': fullName,
       'institutionId': institutionId,
       'identityCardBase64': identityCardBase64,
       'identityNumber': identityNumber,
@@ -64,6 +68,7 @@ class StudentProfileModel {
   // For update requests
   Map<String, dynamic> toUpdateJson() {
     return {
+      'fullName': fullName,
       'identityCardBase64': identityCardBase64,
       'identityNumber': identityNumber,
       'email': email,
