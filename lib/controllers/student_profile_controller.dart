@@ -59,7 +59,7 @@ class StudentProfileController extends GetxController {
           'Successfully loaded profile for: ${currentUserProfile.email} using /profile/me endpoint',
         );
         return;
-            } catch (profileError) {
+      } catch (profileError) {
         print(
           'New endpoint failed: $profileError. Trying alternative approach.',
         );
@@ -95,7 +95,7 @@ class StudentProfileController extends GetxController {
             studentProfile.value = userProfile;
             print('Successfully loaded profile using userId: $userId');
             return;
-                    }
+          }
         }
       } catch (tokenError) {
         print('Error extracting or using userId from token: $tokenError');
@@ -410,6 +410,10 @@ class StudentProfileController extends GetxController {
     error.value = '';
 
     try {
+      print(
+        'Updating academic profile with data: institutionId=$institutionId, programId=$departmentOrProgramId, facultyId=$facultyOrDisciplineId, yearOfStudy=$yearOfStudy',
+      );
+
       final updatedProfile = await _profileService.updateAcademicProfile(
         institutionId: institutionId,
         departmentOrProgramId: departmentOrProgramId,
@@ -421,7 +425,20 @@ class StudentProfileController extends GetxController {
       studentProfile.value = updatedProfile;
       return true;
     } catch (e) {
-      error.value = 'Failed to update academic details: $e';
+      // Better error handling for network issues
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Failed host lookup')) {
+        error.value = 'Network error: Please check your internet connection';
+        print('Exception updating academic profile: $e');
+      } else if (e.toString().contains('401') ||
+          e.toString().toLowerCase().contains('unauthorized')) {
+        error.value = 'Authentication error: Please log in again';
+        print('Authentication error updating academic profile: $e');
+        // Consider handling authentication renewal here
+      } else {
+        error.value = 'Failed to update academic details: $e';
+        print('General error updating academic profile: $e');
+      }
       return false;
     } finally {
       isSaving.value = false;

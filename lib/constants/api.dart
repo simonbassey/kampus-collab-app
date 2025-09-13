@@ -1,6 +1,6 @@
 class ApiConstants {
   // Base API URL
-  static const String baseUrl = 'https://kampus-colab-cdgdg9gec3g7b0bb.canadacentral-01.azurewebsites.net';
+  static const String baseUrl = 'https://kampus-collab-cdgdg9gec3g7b0bb.canadacentral-01.azurewebsites.net';
   static const String apiPrefix = '$baseUrl/api';
   
   // Auth endpoints
