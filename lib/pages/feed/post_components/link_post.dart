@@ -1,24 +1,51 @@
 import 'package:flutter/material.dart';
 import '../../../models/post_model.dart';
 import 'post_base.dart';
+import 'image_viewer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LinkPost extends StatelessWidget {
   final PostModel post;
+  final BuildContext? contextOverride;
+  final bool isInDetailScreen;
+  final GlobalKey _contextHolder = GlobalKey();
   
-  const LinkPost({
+   LinkPost({
     Key? key,
     required this.post,
+    this.contextOverride,
+    this.isInDetailScreen = false,
   }) : super(key: key);
+  
+  BuildContext _getContext() {
+    // This is a workaround to access context for showing dialogs from a stateless widget
+    if (contextOverride != null) return contextOverride!;
+    final context = _contextHolder.currentContext;
+    if (context == null) throw Exception('Context is not available');
+    return context;
+  }
 
   @override
   Widget build(BuildContext context) {
     return PostBase(
       post: post,
       contentWidget: _buildLinkPreview(),
+      isInDetailScreen: isInDetailScreen,
     );
   }
 
   Widget _buildLinkPreview() {
+    if (post.link == null || post.link!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      key: _contextHolder,
+      child: _buildLinkContent(),
+    );
+  }
+  
+  Widget _buildLinkContent() {
     if (post.link == null || post.link!.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -35,11 +62,20 @@ class LinkPost extends StatelessWidget {
         children: [
           // Link Preview Image (optional)
           if (post.images.isNotEmpty)
-            Image.asset(
-              post.images.first,
-              height: 150,
-              width: double.infinity,
-              fit: BoxFit.cover,
+            GestureDetector(
+              onTap: () {
+                ImageViewer.show(
+                  _getContext(),
+                  post.images.first,
+                  isAsset: true,
+                );
+              },
+              child: Image.asset(
+                post.images.first,
+                height: 150,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
           
           // Link Content
@@ -88,9 +124,7 @@ class LinkPost extends StatelessWidget {
                 
                 // Link URL
                 GestureDetector(
-                  onTap: () {
-                    // Open link logic would go here
-                  },
+                  onTap: () => _launchURL(post.link!),
                   child: Text(
                     post.link!,
                     style: TextStyle(
@@ -125,5 +159,39 @@ class LinkPost extends StatelessWidget {
   String _generateLinkTitle(String url) {
     // In a real app, this would be fetched from the link metadata
     return 'Title of the linked content';
+  }
+  
+  // Launch URL in browser
+  Future<void> _launchURL(String urlString) async {
+    try {
+      final Uri url = Uri.parse(urlString);
+      
+      // Try to launch URL
+      final bool canLaunch = await canLaunchUrl(url);
+      
+      if (canLaunch) {
+        // Only attempt to launch if canLaunch returns true
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // Show error if URL can't be launched
+        _showError('Cannot open this URL');
+      }
+    } catch (e) {
+      // Handle platform exceptions (common in simulators)
+      if (e.toString().contains('PlatformException') && 
+          e.toString().contains('channel-error')) {
+        _showError('Cannot open URLs in simulator environment');
+      } else {
+        _showError('Could not open the link: ${e.toString()}');
+      }
+    }
+  }
+  
+  void _showError(String message) {
+    if (_contextHolder.currentContext != null) {
+      ScaffoldMessenger.of(_getContext()).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 }

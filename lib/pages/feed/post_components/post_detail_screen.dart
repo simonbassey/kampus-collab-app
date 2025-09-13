@@ -5,20 +5,16 @@ import 'text_post.dart';
 import 'image_post.dart';
 import 'link_post.dart';
 import 'comment_item.dart';
+import 'image_viewer.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
 
-  const PostDetailScreen({
-    Key? key,
-    required this.post,
-  }) : super(key: key);
+  const PostDetailScreen({Key? key, required this.post}) : super(key: key);
 
   static void show(BuildContext context, PostModel post) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => PostDetailScreen(post: post),
-      ),
+      MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)),
     );
   }
 
@@ -39,7 +35,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     post = widget.post;
     _loadComments();
   }
-  
+
   void _loadComments() {
     // Mock comments data
     _comments.addAll([
@@ -70,14 +66,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
         iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text(
-          'Post',
-          style: TextStyle(color: Colors.black),
-        ),
+        title: const Text('Post', style: TextStyle(color: Colors.black)),
         actions: [
           IconButton(
             icon: Icon(
@@ -98,7 +92,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  _buildPost(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _buildPost(),
+                  ),
                   const Divider(height: 1),
                   _buildCommentsList(),
                 ],
@@ -114,13 +111,27 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget _buildPost() {
     switch (post.type) {
       case PostType.text:
-        return TextPost(post: post);
+        return TextPost(
+          post: post,
+          isInDetailScreen: true, // Flag to prevent navigation loop
+        );
       case PostType.image:
-        return ImagePost(post: post);
+        return ImagePost(
+          post: post,
+          contextOverride: context, // Pass the context for image viewer
+          isInDetailScreen: true, // Flag to prevent navigation loop
+        );
       case PostType.link:
-        return LinkPost(post: post);
+        return LinkPost(
+          post: post,
+          contextOverride: context, // Pass the context for image viewer
+          isInDetailScreen: true, // Flag to prevent navigation loop
+        );
       default:
-        return TextPost(post: post);
+        return TextPost(
+          post: post,
+          isInDetailScreen: true, // Flag to prevent navigation loop
+        );
     }
   }
 
@@ -134,18 +145,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             children: [
               const Text(
                 'Comments',
-                style: TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
               ),
               const SizedBox(width: 8.0),
               Text(
                 '(${_comments.length})',
-                style: TextStyle(
-                  fontSize: 16.0,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16.0, color: Colors.grey[600]),
               ),
               const Spacer(),
               if (_replyingTo != null)
@@ -161,7 +166,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ),
             ],
           ),
-          if (_replyingTo != null) ...[  
+          if (_replyingTo != null) ...[
             const SizedBox(height: 8.0),
             Container(
               padding: const EdgeInsets.all(8.0),
@@ -174,10 +179,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   Expanded(
                     child: Text(
                       'Replying to ${_replyingTo!.userName}',
-                      style: TextStyle(
-                        fontSize: 12.0,
-                        color: Colors.grey[700],
-                      ),
+                      style: TextStyle(fontSize: 12.0, color: Colors.grey[700]),
                     ),
                   ),
                   IconButton(
@@ -192,17 +194,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ],
           const SizedBox(height: 16.0),
           // Comments list
-          ..._comments.map((comment) => CommentItem(
-            comment: comment,
-            onReply: (comment) {
-              setState(() {
-                _replyingTo = comment;
-                // Focus the comment input
-                FocusScope.of(context).requestFocus(FocusNode());
-              });
-            },
-            showReplies: true,
-          )).toList(),
+          ..._comments
+              .map(
+                (comment) => CommentItem(
+                  comment: comment,
+                  onReply: (comment) {
+                    setState(() {
+                      _replyingTo = comment;
+                      // Focus the comment input
+                      FocusScope.of(context).requestFocus(FocusNode());
+                    });
+                  },
+                  showReplies: true,
+                ),
+              )
+              .toList(),
         ],
       ),
     );
@@ -211,6 +217,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget _buildCommentInput() {
     return Container(
       padding: const EdgeInsets.all(12.0),
+      margin: const EdgeInsets.only(bottom: 20.0),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -225,7 +232,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         children: [
           const CircleAvatar(
             radius: 16.0,
-            backgroundImage: NetworkImage('https://randomuser.me/api/portraits/men/1.jpg'),
+            backgroundImage: NetworkImage(
+              'https://randomuser.me/api/portraits/men/1.jpg',
+            ),
           ),
           const SizedBox(width: 12.0),
           Expanded(
@@ -246,19 +255,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
           const SizedBox(width: 8.0),
           IconButton(
-            icon: _isSubmittingComment
-                ? const SizedBox(
-                    width: 20.0,
-                    height: 20.0,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                    ),
-                  )
-                : Icon(
-                    Icons.send,
-                    color: Theme.of(context).primaryColor,
-                  ),
+            icon:
+                _isSubmittingComment
+                    ? const SizedBox(
+                      width: 20.0,
+                      height: 20.0,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.0,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                      ),
+                    )
+                    : Icon(Icons.send, color: Theme.of(context).primaryColor),
             onPressed: _isSubmittingComment ? null : _submitComment,
           ),
         ],
@@ -270,11 +277,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     setState(() {
       post.isBookmarked = !post.isBookmarked;
     });
-    
+
     if (post.isBookmarked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post saved to bookmarks')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Post saved to bookmarks')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Post removed from bookmarks')),
@@ -285,71 +292,72 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _showPostOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Share post'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sharing post...')),
-                );
-              },
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.symmetric(vertical: 20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.share),
+                  title: const Text('Share post'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sharing post...')),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.report_outlined),
+                  title: const Text('Report post'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Post reported')),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.block),
+                  title: const Text('Block user'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('User blocked')),
+                    );
+                  },
+                ),
+                if (post.userId == '1') // Assuming '1' is the current user's ID
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Delete post'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Post deleted')),
+                      );
+                      // Navigate back after deletion
+                      Navigator.of(context).pop();
+                    },
+                  ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.report_outlined),
-              title: const Text('Report post'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Post reported')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.block),
-              title: const Text('Block user'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('User blocked')),
-                );
-              },
-            ),
-            if (post.userId == '1') // Assuming '1' is the current user's ID
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Delete post'),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Post deleted')),
-                  );
-                  // Navigate back after deletion
-                  Navigator.of(context).pop();
-                },
-              ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
   void _submitComment() {
     final commentText = _commentController.text.trim();
-    
+
     if (commentText.isEmpty) {
       return;
     }
-    
+
     setState(() {
       _isSubmittingComment = true;
     });
-    
+
     // Simulate API call
     Future.delayed(const Duration(seconds: 1), () {
       final newComment = CommentModel(
@@ -366,7 +374,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _isSubmittingComment = false;
         post.comments++;
         _commentController.clear();
-        
+
         if (_replyingTo != null) {
           // Add as a reply to the selected comment
           final commentIndex = _comments.indexOf(_replyingTo!);
@@ -379,10 +387,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           _comments.insert(0, newComment);
         }
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comment added')),
-      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Comment added')));
     });
   }
 }

@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum PostType {
-  text,
-  image,
-  link,
-}
+enum PostType { text, image, link }
 
 class PostModel {
   final String id;
@@ -13,6 +9,7 @@ class PostModel {
   final String userAvatar;
   final String userHandle;
   final String userRole;
+  final String? universityLogo; // University logo image path/URL
   final String content;
   final List<String> images;
   final DateTime createdAt;
@@ -31,6 +28,7 @@ class PostModel {
     required this.userAvatar,
     required this.userHandle,
     required this.userRole,
+    this.universityLogo, // Optional university logo
     required this.content,
     this.images = const [],
     required this.createdAt,
@@ -50,7 +48,9 @@ class PostModel {
       userAvatar: 'https://randomuser.me/api/portraits/women/1.jpg',
       userHandle: '@VickyEK',
       userRole: 'Computer Science',
-      content: 'Lorem ipsum dolor sit amet consectetur. Molestie vulputate lobortis id eu nisi est.',
+      universityLogo: 'assets/university_icon.png',
+      content:
+          'Lorem ipsum dolor sit amet consectetur. Molestie vulputate lobortis id eu nisi est.',
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       likes: 0,
       comments: 0,
@@ -67,7 +67,9 @@ class PostModel {
       userAvatar: 'https://randomuser.me/api/portraits/women/1.jpg',
       userHandle: '@VickyEK',
       userRole: 'Computer Science',
-      content: 'Lorem ipsum dolor sit amet consectetur. Molestie vulputate lobortis id eu nisi est.',
+      universityLogo: 'assets/university_icon.png',
+      content:
+          'Lorem ipsum dolor sit amet consectetur. Molestie vulputate lobortis id eu nisi est.',
       images: ['assets/images/Group 13.png', 'assets/images/Group 13.png'],
       createdAt: DateTime.now().subtract(const Duration(hours: 3)),
       likes: 0,
@@ -76,7 +78,7 @@ class PostModel {
       type: PostType.image,
     );
   }
-  
+
   factory PostModel.mockLink() {
     return PostModel(
       id: '3',
@@ -85,6 +87,7 @@ class PostModel {
       userAvatar: 'https://randomuser.me/api/portraits/women/1.jpg',
       userHandle: '@VickyEK',
       userRole: 'Computer Science',
+      universityLogo: 'assets/university_icon.png',
       content: 'Check out this great resource for Flutter development!',
       images: ['assets/images/Group 13.png'],
       createdAt: DateTime.now().subtract(const Duration(hours: 1)),

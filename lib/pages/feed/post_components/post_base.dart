@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import '../../../models/post_model.dart';
 import 'post_detail_screen.dart';
@@ -7,9 +8,14 @@ import '../../../pages/profile/user_profile_screen.dart';
 class PostBase extends StatefulWidget {
   final PostModel post;
   final Widget? contentWidget;
+  final bool isInDetailScreen;
 
-  const PostBase({Key? key, required this.post, this.contentWidget})
-    : super(key: key);
+  const PostBase({
+    Key? key,
+    required this.post,
+    this.contentWidget,
+    this.isInDetailScreen = false,
+  }) : super(key: key);
 
   @override
   State<PostBase> createState() => _PostBaseState();
@@ -28,7 +34,10 @@ class _PostBaseState extends State<PostBase> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        PostDetailScreen.show(context, post);
+        // Only navigate to detail screen if not already in detail screen
+        if (!widget.isInDetailScreen) {
+          PostDetailScreen.show(context, post);
+        }
       },
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 16.0),
@@ -119,6 +128,12 @@ class _PostBaseState extends State<PostBase> {
                       style: TextStyle(color: Colors.grey[500], fontSize: 12.0),
                     ),
                     const SizedBox(width: 16.0),
+                    // University logo
+                    if (post.universityLogo != null) ...[
+                      _buildUniversityLogo(),
+                      const SizedBox(width: 4.0),
+                    ],
+                    // University name (role)
                     Text(
                       post.userRole,
                       style: TextStyle(color: Colors.grey[600], fontSize: 12.0),
@@ -144,25 +159,46 @@ class _PostBaseState extends State<PostBase> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildInteractionButton(
-          post.isLiked ? Icons.favorite : Icons.favorite_border,
-          post.likes.toString(),
-          iconColor: post.isLiked ? Colors.red : null,
-          onTap: _handleLike,
+        _wrapWithContainer(
+          _buildInteractionButton(
+            post.isLiked ? Icons.favorite : Icons.favorite_border,
+            post.likes.toString(),
+            iconColor: post.isLiked ? Colors.red : null,
+            onTap: _handleLike,
+          ),
         ),
         SizedBox(width: 20),
-        _buildInteractionButton(
-          Icons.comment_outlined,
-          post.comments.toString(),
-          onTap: _handleComment,
+        _wrapWithContainer(
+          _buildInteractionButton(
+            Icons.comment_outlined,
+            post.comments.toString(),
+            onTap: _handleComment,
+          ),
         ),
         SizedBox(width: 20),
-        _buildInteractionButton(
-          Icons.share_outlined,
-          post.shares.toString(),
-          onTap: _handleShare,
+        _wrapWithContainer(
+          _buildInteractionButton(
+            Icons.share_outlined,
+            post.shares.toString(),
+            onTap: _handleShare,
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _wrapWithContainer(Widget child) {
+    return Container(
+      width: 85,
+      height: 30,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(30)),
+        color: const Color(0xffF0F0F0).withValues(alpha: 0.7),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: child,
+      ),
     );
   }
 
@@ -273,35 +309,67 @@ class _PostBaseState extends State<PostBase> {
     Color? iconColor,
     VoidCallback? onTap,
   }) {
-    return Container(
-      width: 65,
-      height: 30,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.all(Radius.circular(30)),
-        color: const Color(0xffF0F0F0).withValues(alpha: 0.7),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(icon, size: 20.0, color: iconColor),
+            onPressed: onTap,
+            splashRadius: 20.0,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 2.0),
+          Text(
+            count,
+            style: TextStyle(
+              color: iconColor ?? Colors.grey[600],
+              fontSize: 14.0,
+            ),
+          ),
+          const SizedBox(width: 2.0), // Add space at the end as well
+        ],
       ),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: Icon(icon, size: 20.0, color: iconColor),
-              onPressed: onTap,
-              splashRadius: 20.0,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            const SizedBox(width: 4.0),
-            Text(
-              count,
-              style: TextStyle(
-                color: iconColor ?? Colors.grey[600],
-                fontSize: 14.0,
-              ),
-            ),
-          ],
-        ),
+    );
+  }
+
+  Widget _buildUniversityLogo() {
+    return SizedBox(
+      width: 16,
+      height: 16,
+      child: Builder(
+        builder: (context) {
+          try {
+            // Check if the logo is SVG or regular image
+            if (post.universityLogo!.endsWith('.svg')) {
+              return SvgPicture.asset(
+                post.universityLogo!,
+                width: 16,
+                height: 16,
+                placeholderBuilder:
+                    (context) =>
+                        Icon(Icons.school, size: 16, color: Colors.grey[600]),
+              );
+            } else {
+              return Image.asset(
+                post.universityLogo!,
+                width: 16,
+                height: 16,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.school, size: 16, color: Colors.grey[600]);
+                },
+              );
+            }
+          } catch (e) {
+            // Fallback to a default icon if anything goes wrong
+            return Icon(Icons.school, size: 16, color: Colors.grey[600]);
+          }
+        },
       ),
     );
   }
