@@ -43,3 +43,42 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Visual Studio Code specific files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Local History for Visual Studio Code
+.history/
+.ionide
+
+# VS Code Flutter/Dart specific
+.fvm/
+
+# VS Code debugging
+*.vsix
+.vscode-test/
+.nyc_output/
+*.vsix
+coverage/
+
+# iOS/XCode related
+**/ios/Pods/
+**/ios/Podfile.lock
+**/ios/.symlinks/
+**/ios/Flutter/flutter_export_environment.sh
+
+# Flutter DevTools
+.dart_tool/flutter_build/
+.dart_tool/package_config.json
+.dart_tool/package_config_subset
+.dart_tool/version
+devtools_options.yaml
+
+# Flutter/Dart package files
+*.lock
+pubspec.lock

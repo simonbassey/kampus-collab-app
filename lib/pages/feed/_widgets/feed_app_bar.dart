@@ -42,12 +42,12 @@ class FeedAppBar extends StatelessWidget {
                             profileController
                                     .studentProfile
                                     .value!
-                                    .profilePicture !=
+                                    .profilePhotoUrl !=
                                 null &&
                             profileController
                                     .studentProfile
                                     .value!
-                                    .profilePicture !=
+                                    .profilePhotoUrl !=
                                 'placeholder_image_data';
 
                         // Try to decode the profile image if it exists
@@ -58,7 +58,7 @@ class FeedAppBar extends StatelessWidget {
                                 profileController
                                     .studentProfile
                                     .value!
-                                    .profilePicture!;
+                                    .profilePhotoUrl!;
                             final Uint8List imageBytes = base64Decode(
                               base64String,
                             );

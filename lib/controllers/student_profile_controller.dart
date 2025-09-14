@@ -132,7 +132,7 @@ class StudentProfileController extends GetxController {
       );
 
       // Check if the found profile is empty (default model)
-      if (currentUserProfile.id == null) {
+      if (currentUserProfile.userId == null) {
         error.value =
             'Profile not found for your account. Please create a profile.';
         // Navigate to profile setup page
@@ -166,120 +166,6 @@ class StudentProfileController extends GetxController {
     }
   }
 
-  // Method to create a new profile
-  Future<bool> createProfile({
-    required int institutionId,
-    String? fullName,
-    required String email,
-    String? shortBio,
-    required File? idCardFile,
-    String? identityNumber,
-    required File? profileImageFile,
-    int? departmentOrProgramId,
-    int? facultyOrDisciplineId,
-    int? yearOfStudy,
-  }) async {
-    if (!_authController.isAuthenticated.value) {
-      error.value = 'User not authenticated';
-      return false;
-    }
-
-    isSaving.value = true;
-    error.value = '';
-
-    try {
-      // API requires both identityCardBase64 and profilePicture fields
-      // Default to placeholder values that will pass API validation
-      String identityCardBase64 = 'placeholder_image_data';
-      String profilePictureBase64 = 'placeholder_image_data';
-
-      // Try to encode actual images if they're available
-      if (idCardFile != null) {
-        try {
-          print('Encoding ID card image...');
-          final bytes = await idCardFile.readAsBytes();
-          identityCardBase64 = base64Encode(bytes);
-          print('ID card image encoded successfully');
-        } catch (e) {
-          print('Error encoding ID card image: $e');
-          // Keep using placeholder if encoding fails
-        }
-      } else {
-        print('No ID card image provided, using placeholder');
-      }
-
-      if (profileImageFile != null) {
-        try {
-          print('Encoding profile image...');
-          final bytes = await profileImageFile.readAsBytes();
-          profilePictureBase64 = base64Encode(bytes);
-          print('Profile image encoded successfully');
-        } catch (e) {
-          print('Error encoding profile image: $e');
-          // Keep using placeholder if encoding fails
-        }
-      } else {
-        print('No profile image provided, using placeholder');
-      }
-
-      // Try to extract userId from the token
-      String? userId;
-      try {
-        // Get current user ID from auth token
-        final token = await _authController.getAuthToken();
-        if (token != null && token.isNotEmpty) {
-          // Parse the middle part of the JWT token
-          final parts = token.split('.');
-          if (parts.length > 1) {
-            final payload = parts[1];
-            final normalized = base64.normalize(payload);
-            final decoded = utf8.decode(base64.decode(normalized));
-            final Map<String, dynamic> decodedJson = jsonDecode(decoded);
-
-            // Get the user ID from the token claims
-            // Try different claim fields that might contain the user ID
-            userId =
-                decodedJson['sub'] ??
-                decodedJson['nameid'] ??
-                decodedJson['sid'];
-
-            print('Extracted userId from token: $userId');
-          }
-        }
-      } catch (e) {
-        print('Error extracting userId from token: $e');
-        // Continue without userId, but log the error
-      }
-
-      final profile = StudentProfileModel(
-        // Include userId if we could extract it from token
-        userId: userId,
-        fullName: fullName,
-        institutionId: institutionId,
-        identityCardBase64: identityCardBase64,
-        // Ensure identityNumber is not empty
-        identityNumber:
-            identityNumber?.isNotEmpty == true ? identityNumber : 'N/A',
-        email: email,
-        profilePicture: profilePictureBase64,
-        shortBio: shortBio,
-        departmentOrProgramId: departmentOrProgramId ?? 1,
-        facultyOrDisciplineId: facultyOrDisciplineId ?? 1,
-        yearOfStudy: yearOfStudy ?? 1,
-      );
-
-      print('Creating profile for email: $email');
-      final createdProfile = await _profileService.createProfile(profile);
-      studentProfile.value = createdProfile;
-      return true;
-    } catch (e) {
-      error.value = 'Failed to create profile: $e';
-      return false;
-    } finally {
-      isSaving.value = false;
-    }
-  }
-
   // Method to update an existing profile
   Future<bool> updateProfile({
     String? fullName,
@@ -292,7 +178,7 @@ class StudentProfileController extends GetxController {
     int? facultyOrDisciplineId,
     int? yearOfStudy,
   }) async {
-    if (studentProfile.value == null || studentProfile.value!.id == null) {
+    if (studentProfile.value == null || studentProfile.value!.userId == null) {
       error.value = 'No profile exists to update';
       return false;
     }
@@ -304,9 +190,10 @@ class StudentProfileController extends GetxController {
       // API validation requires these fields to be present
       // Default to existing values or placeholder as fallback
       String identityCardBase64 =
-          studentProfile.value!.identityCardBase64 ?? 'placeholder_image_data';
+          studentProfile.value!.academicDetails?.identityCardBase64 ??
+          'placeholder_image_data';
       String profilePictureBase64 =
-          studentProfile.value!.profilePicture ?? 'placeholder_image_data';
+          studentProfile.value!.profilePhotoUrl ?? 'placeholder_image_data';
 
       // Try to encode new images if provided
       if (idCardFile != null) {
@@ -338,23 +225,43 @@ class StudentProfileController extends GetxController {
       }
 
       final updatedProfile = StudentProfileModel(
-        identityCardBase64: identityCardBase64,
-        identityNumber: identityNumber ?? studentProfile.value!.identityNumber,
         fullName: fullName ?? studentProfile.value!.fullName,
         email: email ?? studentProfile.value!.email,
-        profilePicture: profilePictureBase64,
+        profilePhotoUrl: profilePictureBase64,
         shortBio: shortBio ?? studentProfile.value!.shortBio,
-        departmentOrProgramId:
-            departmentOrProgramId ??
-            studentProfile.value!.departmentOrProgramId,
-        facultyOrDisciplineId:
-            facultyOrDisciplineId ??
-            studentProfile.value!.facultyOrDisciplineId,
-        yearOfStudy: yearOfStudy ?? studentProfile.value!.yearOfStudy,
+        academicDetails: AcadmicProfileDetails(
+          institutionId:
+              studentProfile.value!.academicDetails?.institutionId ?? 0,
+          institutionName:
+              studentProfile.value!.academicDetails?.institutionName ?? '',
+          departmentOrProgramId:
+              departmentOrProgramId ??
+              studentProfile.value!.academicDetails?.departmentOrProgramId ??
+              0,
+          departmentOrProgramName:
+              studentProfile.value!.academicDetails?.departmentOrProgramName ??
+              '',
+          facultyOrDisciplineId:
+              facultyOrDisciplineId ??
+              studentProfile.value!.academicDetails?.facultyOrDisciplineId ??
+              0,
+          facultyOrDisciplineName:
+              studentProfile.value!.academicDetails?.facultyOrDisciplineName ??
+              '',
+          yearOfStudy:
+              yearOfStudy ??
+              studentProfile.value!.academicDetails?.yearOfStudy ??
+              0,
+          identityCardBase64: identityCardBase64,
+          identityNumber:
+              identityNumber ??
+              studentProfile.value!.academicDetails?.identityNumber ??
+              '',
+        ),
       );
 
       final result = await _profileService.updateProfile(
-        studentProfile.value!.id!,
+        studentProfile.value!.userId!,
         updatedProfile,
       );
 
@@ -370,7 +277,7 @@ class StudentProfileController extends GetxController {
 
   // Method to delete a profile
   Future<bool> deleteProfile() async {
-    if (studentProfile.value == null || studentProfile.value!.id == null) {
+    if (studentProfile.value == null || studentProfile.value!.userId == null) {
       error.value = 'No profile exists to delete';
       return false;
     }
@@ -380,7 +287,7 @@ class StudentProfileController extends GetxController {
 
     try {
       final result = await _profileService.deleteProfile(
-        studentProfile.value!.id!,
+        studentProfile.value!.userId!,
       );
       if (result) {
         studentProfile.value = null;
@@ -468,17 +375,23 @@ class StudentProfileController extends GetxController {
     // Print raw object representation to see all available data
     print('Raw Profile Object: $profile');
     // Print a more detailed view of each field
-    print('ID: ${profile.id}');
+    print('ID: ${profile.userId}');
     print('UserID: ${profile.userId}');
     print('Full Name: ${profile.fullName}');
     print('Email: ${profile.email}');
     print('Short Bio: ${profile.shortBio}');
-    print('Institution ID: ${profile.institutionId}');
-    print('Department/Program ID: ${profile.departmentOrProgramId}');
-    print('Faculty/Discipline ID: ${profile.facultyOrDisciplineId}');
-    print('Year of Study: ${profile.yearOfStudy}');
-    print('Has Identity Card: ${profile.identityCardBase64 != null}');
-    print('Has Profile Picture: ${profile.profilePicture != null}');
+    print('Institution ID: ${profile.academicDetails?.institutionId}');
+    print(
+      'Department/Program ID: ${profile.academicDetails?.departmentOrProgramId}',
+    );
+    print(
+      'Faculty/Discipline ID: ${profile.academicDetails?.facultyOrDisciplineId}',
+    );
+    print('Year of Study: ${profile.academicDetails?.yearOfStudy}');
+    print(
+      'Has Identity Card: ${profile.academicDetails?.identityCardBase64 != null}',
+    );
+    print('Has Profile Picture: ${profile.profilePhotoUrl != null}');
     print('=============== END PROFILE DETAILS ===============');
   }
 }
