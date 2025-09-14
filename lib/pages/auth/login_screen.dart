@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../controllers/auth_controller.dart';
+import '../auth/signup_screen.dart';
+import '../auth/create_account_flow/create_account_otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,15 +31,18 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       final result = await _authController.login(
         _emailController.text.trim(),
-        _passwordController.text
+        _passwordController.text,
       );
-      
+
       if (result['success']) {
         // Navigate to feed page
         Get.offAllNamed('/feed');
       } else if (result['needsVerification'] == true) {
-        // Navigate to OTP verification screen
-        Get.toNamed('/create-account-otp', arguments: {'email': result['email']});
+        // Navigate to OTP verification screen - using off() to avoid potential navigator locks
+        Get.off(
+          () => const CreateAccountOtpScreen(),
+          arguments: {'email': result['email']},
+        );
       } else {
         // Show error message
         Get.snackbar(
@@ -55,13 +60,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 19.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 19.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -73,13 +81,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.5,
-                      fontSize: 20
+                      fontSize: 20,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  
+
                   const SizedBox(height: 60.0),
-                  
+
                   // Login Title
                   Text(
                     'Login to your account',
@@ -91,10 +99,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-              
-                  
+
                   const SizedBox(height: 16.0),
-                  
+
                   // Sign up link
                   Center(
                     child: RichText(
@@ -115,17 +122,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.w400,
                               fontSize: 16,
                             ),
-                            recognizer: TapGestureRecognizer()..onTap = () {
-                              Get.toNamed('/signup');
-                            },
+                            recognizer:
+                                TapGestureRecognizer()
+                                  ..onTap = () {
+                                    // Use Get.off() instead of toNamed() to avoid navigation lock errors
+                                    // This removes the current screen from the stack before navigating
+                                    Get.off(() => const SignupScreen());
+                                  },
                           ),
                         ],
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 48.0),
-                  
+
                   // Email Field
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,7 +211,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             return 'Email is required';
                           }
                           // Email validation regex
-                          final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                          final emailRegex = RegExp(
+                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                          );
                           if (!emailRegex.hasMatch(value)) {
                             return 'Please enter a valid email address';
                           }
@@ -210,16 +223,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 24.0),
-                  
+
                   // Password Field
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Password',
-                         style: theme.textTheme.bodySmall?.copyWith(
+                        style: theme.textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w400,
                           fontSize: 13,
                           color: Color(0xFF414141),
@@ -308,45 +321,51 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 32.0),
-                  
+
                   // Login Button
-                  Obx(() => ElevatedButton(
-                    onPressed: _authController.isLoggingIn.value ? null : () {
-                      if (_formKey.currentState!.validate()) {
-                        _login();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      backgroundColor: const Color(0xFF5796FF),
-                    ),
-                    child: _authController.isLoggingIn.value
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'Login',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontSize: 16.0,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                            fontFamily: GoogleFonts.inter().fontFamily,
-                          ),
+                  Obx(
+                    () => ElevatedButton(
+                      onPressed:
+                          _authController.isLoggingIn.value
+                              ? null
+                              : () {
+                                if (_formKey.currentState!.validate()) {
+                                  _login();
+                                }
+                              },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14.0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                  )),
-                  
+                        backgroundColor: const Color(0xFF5796FF),
+                      ),
+                      child:
+                          _authController.isLoggingIn.value
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : Text(
+                                'Login',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                  fontFamily: GoogleFonts.inter().fontFamily,
+                                ),
+                              ),
+                    ),
+                  ),
+
                   const SizedBox(height: 16.0),
-                  
+
                   // Forgot Password Link
                   Center(
                     child: TextButton(
@@ -363,9 +382,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 40.0),
-                  
+
                   // Divider with "or"
                   Row(
                     children: [
@@ -393,9 +412,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 24.0),
-                  
+
                   // Google Sign In Button
                   OutlinedButton.icon(
                     onPressed: () {
@@ -426,7 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24.0),
                 ],
               ),

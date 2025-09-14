@@ -36,6 +36,67 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   // Loading state
   RxBool isLoading = false.obs;
+  RxBool isFetchingProfile = false.obs;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Fetch current profile data when the screen initializes
+    _fetchCurrentProfileData();
+  }
+
+  // Fetch the current user's profile data
+  Future<void> _fetchCurrentProfileData() async {
+    isFetchingProfile.value = true;
+    try {
+      // First try the new API endpoint
+      await _profileController.fetchCurrentUserProfile();
+      
+      // If profile was successfully fetched, populate the form
+      if (_profileController.studentProfile.value != null) {
+        _populateFormWithProfileData();
+      }
+    } catch (e) {
+      print('Error fetching profile data: $e');
+      // Show a snackbar with the error
+      Get.snackbar(
+        'Error',
+        'Could not load your profile data: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isFetchingProfile.value = false;
+    }
+  }
+  
+  // Populate form fields with existing profile data
+  void _populateFormWithProfileData() {
+    final profile = _profileController.studentProfile.value;
+    if (profile != null) {
+      // Set the text controllers with existing data
+      if (profile.fullName?.isNotEmpty == true) {
+        _nameController.text = profile.fullName!;
+      }
+      
+      if (profile.email?.isNotEmpty == true) {
+        _emailController.text = profile.email!;
+      }
+      
+      if (profile.shortBio?.isNotEmpty == true) {
+        _bioController.text = profile.shortBio!;
+      }
+      
+      if (profile.identityNumber?.isNotEmpty == true) {
+        _identityNumberController.text = profile.identityNumber!;
+      }
+      
+      // Note: For profile image and ID card, we cannot set File objects directly.
+      // We would need to store the paths or URLs and display them, but we won't
+      // modify the actual File objects until the user selects new files.
+    }
+  }
 
   @override
   void dispose() {
@@ -101,9 +162,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         child: const Text(
                           'Save',
                           style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 14,
+                            letterSpacing: -0.41,
+                            color: Color(0xff333333),
                           ),
                         ),
                       ),
@@ -450,12 +514,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
-  void _saveProfile() async {
-    // Validate required fields
-    if (_emailController.text.isEmpty) {
+  Future<void> _saveProfile() async {
+    if (_nameController.text.isEmpty) {
       Get.snackbar(
         'Error',
-        'Email address is required',
+        'Please enter a username',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -463,60 +526,97 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
 
-    isLoading.value = true;
-
-    bool success;
-    // Check if we're creating or updating the profile
-    if (_profileController.studentProfile.value == null ||
-        _profileController.studentProfile.value!.id == null) {
-      // Creating a new profile
-      success = await _profileController.createProfile(
-        institutionId:
-            1, // Default institution ID - should be dynamic in production
-        email: _emailController.text,
-        shortBio: _bioController.text,
-        idCardFile: _idCardFile,
-        identityNumber: _identityNumberController.text,
-        profileImageFile: _profileImageFile,
-        // These would need proper UI elements for selection
-        departmentOrProgramId: 1, // Default value
-        facultyOrDisciplineId: 1, // Default value
-        yearOfStudy: 1, // Default value
-      );
-    } else {
-      // Updating an existing profile
-      success = await _profileController.updateProfile(
-        email: _emailController.text,
-        shortBio: _bioController.text,
-        idCardFile: _idCardFile,
-        identityNumber: _identityNumberController.text,
-        profileImageFile: _profileImageFile,
-      );
-    }
-
-    isLoading.value = false;
-
-    if (success) {
-      Get.snackbar(
-        'Profile Updated',
-        'Your profile information has been saved',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF5796FF),
-        colorText: Colors.white,
-        margin: const EdgeInsets.all(16),
-      );
-
-      // Navigate to profile page
-      Get.offAndToNamed('/profile');
-    } else {
-      // Show error message
+    if (_emailController.text.isEmpty) {
       Get.snackbar(
         'Error',
-        _profileController.error.value,
+        'Please enter an email address',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+      return;
+    }
+
+    // Set loading state
+    isLoading.value = true;
+
+    bool success = false;
+    try {
+      // Check if we're updating an existing profile or creating a new one
+      final existingProfile = _profileController.studentProfile.value;
+      
+      if (existingProfile != null && existingProfile.id != null) {
+        // Updating existing profile
+        success = await _profileController.updateProfile(
+          fullName: _nameController.text,
+          email: _emailController.text,
+          shortBio: _bioController.text,
+          idCardFile: _idCardFile,
+          identityNumber: _identityNumberController.text,
+          profileImageFile: _profileImageFile,
+        );
+        
+        if (success) {
+          Get.snackbar(
+            'Success',
+            'Profile updated successfully',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+          // Navigate back to profile page
+          Get.back();
+        } else {
+          Get.snackbar(
+            'Error',
+            'Failed to update profile: ${_profileController.error.value}',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      } else {
+        // Creating a new profile
+        success = await _profileController.createProfile(
+          institutionId: 1, // Default institution ID - should be dynamic in production
+          fullName: _nameController.text,
+          email: _emailController.text,
+          shortBio: _bioController.text,
+          idCardFile: _idCardFile,
+          identityNumber: _identityNumberController.text,
+          profileImageFile: _profileImageFile,
+        );
+        
+        if (success) {
+          Get.snackbar(
+            'Success',
+            'Profile created successfully',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+          // Navigate back to profile page
+          Get.back();
+        } else {
+          Get.snackbar(
+            'Error',
+            'Failed to create profile: ${_profileController.error.value}',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'An error occurred: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoading.value = false;
     }
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../models/institution_model.dart';
+import '../../models/program_model.dart';
+import '../../services/academic_service.dart';
 import '../onboarding/username_screen.dart';
 
 class AcademicDetailsScreen extends StatefulWidget {
@@ -12,27 +15,23 @@ class AcademicDetailsScreen extends StatefulWidget {
 
 class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
-  String? _selectedInstitution;
-  String? _selectedCourse;
+  final AcademicService _academicService = AcademicService();
+
+  // Selected values
+  InstitutionModel? _selectedInstitution;
+  ProgramModel? _selectedProgram;
   String? _selectedLevel;
+
+  // State variables
   bool _isLoading = false;
-  
-  // Sample data for dropdowns
-  final List<String> _institutions = [
-    'University Of Calabar',
-    'University of Lagos',
-    'University of Ibadan',
-    'Federal University of Technology, Akure',
-  ];
-  
-  final List<String> _courses = [
-    'Food Engineering',
-    'Computer Science',
-    'Electrical Engineering',
-    'Medicine',
-    'Business Administration',
-  ];
-  
+  bool _isLoadingInstitutions = true;
+  bool _isLoadingPrograms = false;
+  String _error = '';
+
+  // Data for dropdowns
+  final RxList<InstitutionModel> _institutions = <InstitutionModel>[].obs;
+  final RxList<ProgramModel> _programs = <ProgramModel>[].obs;
+
   final List<String> _levels = [
     '100 LEVEL',
     '200 LEVEL',
@@ -41,37 +40,100 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
     '500 LEVEL',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchInstitutions();
+  }
+
+  Future<void> _fetchInstitutions() async {
+    try {
+      setState(() {
+        _isLoadingInstitutions = true;
+        _error = '';
+      });
+
+      final institutions = await _academicService.getInstitutions();
+
+      _institutions.value = institutions;
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load institutions: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoadingInstitutions = false;
+      });
+    }
+  }
+
+  Future<void> _fetchPrograms(int institutionId) async {
+    try {
+      setState(() {
+        _isLoadingPrograms = true;
+        _error = '';
+        _selectedProgram = null;
+      });
+
+      final programs = await _academicService.getProgramsByInstitution(
+        institutionId,
+      );
+
+      _programs.value = programs;
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load programs: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoadingPrograms = false;
+      });
+    }
+  }
+
   void _continueToUsername() {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
-      
-      // Simulate a short delay before navigation
-      Future.delayed(const Duration(milliseconds: 800), () {
-        // Navigate to username screen
-        Get.to(() => const UsernameScreen());
-        
-        // Reset loading state if the screen is still mounted
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      });
+
+      // Store the selected values in Get storage to be used later
+      if (_selectedInstitution != null &&
+          _selectedProgram != null &&
+          _selectedLevel != null) {
+        // Pass the data as arguments to the username screen
+        Get.to(
+          () => const UsernameScreen(),
+          arguments: {
+            'institutionId': _selectedInstitution!.id,
+            'programId': _selectedProgram!.id,
+            'level': _selectedLevel,
+          },
+        );
+      }
+
+      // Reset loading state if the screen is still mounted
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 19.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 19.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -83,13 +145,13 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.5,
-                      fontSize: 20
+                      fontSize: 20,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  
+
                   const SizedBox(height: 40.0),
-                  
+
                   // Academic Details Title
                   Text(
                     'Academic Details',
@@ -101,9 +163,19 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                     ),
                     textAlign: TextAlign.left,
                   ),
-                  
+
                   const SizedBox(height: 32.0),
-                  
+
+                  // Error message (if any)
+                  if (_error.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        _error,
+                        style: TextStyle(color: Colors.red, fontSize: 14),
+                      ),
+                    ),
+
                   // Institution Dropdown
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,83 +189,100 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                         ),
                       ),
                       const SizedBox(height: 8.0),
-                      DropdownButtonFormField<String>(
-                        value: _selectedInstitution,
-                        hint: Text(
-                          'E.g, University Of Calabar',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF9CA3AF),
-                            fontSize: 16,
-                            fontFamily: GoogleFonts.inter().fontFamily,
-                          ),
-                        ),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          fontFamily: GoogleFonts.inter().fontFamily,
-                        ),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE8E8E8),
-                              width: 1.0,
+                      _isLoadingInstitutions
+                          ? const Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<InstitutionModel>(
+                            value: _selectedInstitution,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE8E8E8),
+                                  width: 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE8E8E8),
+                                  width: 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF5796FF),
+                                  width: 2.0,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 12.0,
+                              ),
                             ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE8E8E8),
-                              width: 1.0,
+                            hint: Text(
+                              'Select your institution',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF9CA3AF),
+                                fontSize: 16,
+                                fontFamily: GoogleFonts.inter().fontFamily,
+                              ),
                             ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF5796FF),
-                              width: 2.0,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 16,
+                              fontFamily: GoogleFonts.inter().fontFamily,
                             ),
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select your institution';
+                              }
+                              return null;
+                            },
+                            items:
+                                _institutions.map((
+                                  InstitutionModel institution,
+                                ) {
+                                  return DropdownMenuItem<InstitutionModel>(
+                                    value: institution,
+                                    child: Text(
+                                      institution.name,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontSize: 16,
+                                            fontFamily:
+                                                GoogleFonts.inter().fontFamily,
+                                          ),
+                                    ),
+                                  );
+                                }).toList(),
+                            onChanged: (InstitutionModel? newValue) {
+                              setState(() {
+                                _selectedInstitution = newValue;
+                                if (newValue != null) {
+                                  _fetchPrograms(newValue.id);
+                                }
+                              });
+                            },
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Color(0xFF414141),
+                            ),
+                            isExpanded: true,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 12.0,
-                          ),
-                        ),
-                        items: _institutions.map((String institution) {
-                          return DropdownMenuItem<String>(
-                            value: institution,
-                            child: Text(institution),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _selectedInstitution = newValue;
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select an institution';
-                          }
-                          return null;
-                        },
-                        icon: const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Color(0xFF414141),
-                        ),
-                        isExpanded: true,
-                      ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 24.0),
-                  
+
                   // Course Dropdown
+                  const SizedBox(height: 24.0),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Course',
+                        'Program/Course',
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w400,
                           fontSize: 13,
@@ -201,77 +290,111 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                         ),
                       ),
                       const SizedBox(height: 8.0),
-                      DropdownButtonFormField<String>(
-                        value: _selectedCourse,
-                        hint: Text(
-                          'Food Engineering',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF9CA3AF),
-                            fontSize: 16,
-                            fontFamily: GoogleFonts.inter().fontFamily,
-                          ),
-                        ),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          fontFamily: GoogleFonts.inter().fontFamily,
-                        ),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE8E8E8),
-                              width: 1.0,
+                      _isLoadingPrograms
+                          ? Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<ProgramModel>(
+                            value: _selectedProgram,
+                            hint: Text(
+                              _selectedInstitution == null
+                                  ? 'Select an institution first'
+                                  : 'Select your program',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF9CA3AF),
+                                fontSize: 16,
+                                fontFamily: GoogleFonts.inter().fontFamily,
+                              ),
                             ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE8E8E8),
-                              width: 1.0,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 16,
+                              fontFamily: GoogleFonts.inter().fontFamily,
                             ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF5796FF),
-                              width: 2.0,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE8E8E8),
+                                  width: 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE8E8E8),
+                                  width: 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF5796FF),
+                                  width: 2.0,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 12.0,
+                              ),
                             ),
+                            items:
+                                _programs.isEmpty &&
+                                        _selectedInstitution != null
+                                    ? [
+                                      DropdownMenuItem<ProgramModel>(
+                                        value: null,
+                                        child: Text(
+                                          'No programs available',
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                fontSize: 16,
+                                                fontFamily:
+                                                    GoogleFonts.inter()
+                                                        .fontFamily,
+                                              ),
+                                        ),
+                                      ),
+                                    ]
+                                    : _programs.map((ProgramModel program) {
+                                      return DropdownMenuItem<ProgramModel>(
+                                        value: program,
+                                        child: Text(
+                                          program.name,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                fontSize: 16,
+                                                fontFamily:
+                                                    GoogleFonts.inter()
+                                                        .fontFamily,
+                                              ),
+                                        ),
+                                      );
+                                    }).toList(),
+                            onChanged:
+                                _selectedInstitution == null
+                                    ? null
+                                    : (ProgramModel? newValue) {
+                                      setState(() {
+                                        _selectedProgram = newValue;
+                                      });
+                                    },
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select a program';
+                              }
+                              return null;
+                            },
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Color(0xFF414141),
+                            ),
+                            isExpanded: true,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 12.0,
-                          ),
-                        ),
-                        items: _courses.map((String course) {
-                          return DropdownMenuItem<String>(
-                            value: course,
-                            child: Text(course),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _selectedCourse = newValue;
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select a course';
-                          }
-                          return null;
-                        },
-                        icon: const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Color(0xFF414141),
-                        ),
-                        isExpanded: true,
-                      ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 24.0),
-                  
+
                   // Level Dropdown
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,12 +451,13 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                             vertical: 12.0,
                           ),
                         ),
-                        items: _levels.map((String level) {
-                          return DropdownMenuItem<String>(
-                            value: level,
-                            child: Text(level),
-                          );
-                        }).toList(),
+                        items:
+                            _levels.map((String level) {
+                              return DropdownMenuItem<String>(
+                                value: level,
+                                child: Text(level),
+                              );
+                            }).toList(),
                         onChanged: (String? newValue) {
                           setState(() {
                             _selectedLevel = newValue;
@@ -353,9 +477,9 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 60.0),
-                  
+
                   // Continue Button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _continueToUsername,
@@ -378,14 +502,16 @@ class _AcademicDetailsScreenState extends State<AcademicDetailsScreen> {
                             fontFamily: GoogleFonts.inter().fontFamily,
                           ),
                         ),
-                        if (_isLoading) ...[  
+                        if (_isLoading) ...[
                           const SizedBox(width: 8),
                           const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           ),
                         ],

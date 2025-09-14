@@ -1,6 +1,6 @@
 class ApiConstants {
   // Base API URL
-  static const String baseUrl = 'https://kampus-colab-cdgdg9gec3g7b0bb.canadacentral-01.azurewebsites.net';
+  static const String baseUrl = 'https://kampus-collab-cdgdg9gec3g7b0bb.canadacentral-01.azurewebsites.net';
   static const String apiPrefix = '$baseUrl/api';
   
   // Auth endpoints
@@ -33,6 +33,11 @@ class ApiConstants {
   static const String getAllStudentProfiles = '$apiPrefix/StudentProfiles/all';
   static const String updateStudentProfile = '$apiPrefix/StudentProfiles/update/{id}';
   static const String deleteStudentProfile = '$apiPrefix/StudentProfiles/delete/{id}';
+  
+  // New Profile endpoints
+  static const String getCurrentUserProfile = '$apiPrefix/profile/me';
+  static const String getUserProfileById = '$apiPrefix/profile/{userId}';
+  static const String updateAcademicProfile = '$apiPrefix/profile/update/academic';
   
   // Institution endpoints
   static const String createInstitution = '$apiPrefix/institutions/create';

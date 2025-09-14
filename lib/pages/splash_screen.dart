@@ -55,7 +55,8 @@ class SplashScreenState extends State<SplashScreen> with SingleTickerProviderSta
       Get.offAllNamed('/feed');
     } else {
       // User is not authenticated, go to first/onboarding screen
-      Get.offAllNamed('/first');
+      // Get.offAllNamed('/first');
+       Get.offAllNamed('/feed');
     }
   }
 

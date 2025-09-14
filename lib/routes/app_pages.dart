@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 import 'package:inkstryq/pages/feed/feed_screen.dart';
+import 'package:inkstryq/pages/feed/_pages/feed_search_screen.dart';
+import 'package:inkstryq/pages/chat_ai/chat_ai_page.dart';
 import 'package:inkstryq/pages/onboarding/academic_details_screen.dart';
 import 'package:inkstryq/pages/auth/create_account_flow/create_account_screen.dart';
 import 'package:inkstryq/pages/auth/create_account_flow/create_account_otp_screen.dart';
@@ -73,6 +75,14 @@ class AppPages {
     GetPage(
       name: '/profile',
       page: () => const ProfilePage(),
+    ),
+    GetPage(
+      name: '/chat_ai',
+      page: () => const ChatAIPage(),
+    ),
+    GetPage(
+      name: '/feed-search',
+      page: () => const FeedSearchScreen(),
     ),
   ];
 }

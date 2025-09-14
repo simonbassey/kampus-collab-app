@@ -49,5 +49,11 @@
     <string>This app needs access to camera to take profile photos and upload student ID</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app needs access to photo library to select profile photos and upload student ID</string>
+    <!-- Added for url_launcher support -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>http</string>
+      <string>https</string>
+    </array>
   </dict>
 </plist>
