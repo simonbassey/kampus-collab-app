@@ -37,7 +37,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Loading state
   RxBool isLoading = false.obs;
   RxBool isFetchingProfile = false.obs;
-  
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +51,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       // First try the new API endpoint
       await _profileController.fetchCurrentUserProfile();
-      
+
       // If profile was successfully fetched, populate the form
       if (_profileController.studentProfile.value != null) {
         _populateFormWithProfileData();
@@ -70,7 +70,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       isFetchingProfile.value = false;
     }
   }
-  
+
   // Populate form fields with existing profile data
   void _populateFormWithProfileData() {
     final profile = _profileController.studentProfile.value;
@@ -79,19 +79,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (profile.fullName?.isNotEmpty == true) {
         _nameController.text = profile.fullName!;
       }
-      
+
       if (profile.email?.isNotEmpty == true) {
         _emailController.text = profile.email!;
       }
-      
+
       if (profile.shortBio?.isNotEmpty == true) {
         _bioController.text = profile.shortBio!;
       }
-      
-      if (profile.identityNumber?.isNotEmpty == true) {
-        _identityNumberController.text = profile.identityNumber!;
+
+      if (profile.academicDetails?.identityNumber?.isNotEmpty == true) {
+        _identityNumberController.text =
+            profile.academicDetails!.identityNumber!;
       }
-      
+
       // Note: For profile image and ID card, we cannot set File objects directly.
       // We would need to store the paths or URLs and display them, but we won't
       // modify the actual File objects until the user selects new files.
@@ -544,8 +545,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       // Check if we're updating an existing profile or creating a new one
       final existingProfile = _profileController.studentProfile.value;
-      
-      if (existingProfile != null && existingProfile.id != null) {
+
+      if (existingProfile != null && existingProfile.academicDetails != null) {
         // Updating existing profile
         success = await _profileController.updateProfile(
           fullName: _nameController.text,
@@ -555,7 +556,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           identityNumber: _identityNumberController.text,
           profileImageFile: _profileImageFile,
         );
-        
+
         if (success) {
           Get.snackbar(
             'Success',
@@ -570,37 +571,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           Get.snackbar(
             'Error',
             'Failed to update profile: ${_profileController.error.value}',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-          );
-        }
-      } else {
-        // Creating a new profile
-        success = await _profileController.createProfile(
-          institutionId: 1, // Default institution ID - should be dynamic in production
-          fullName: _nameController.text,
-          email: _emailController.text,
-          shortBio: _bioController.text,
-          idCardFile: _idCardFile,
-          identityNumber: _identityNumberController.text,
-          profileImageFile: _profileImageFile,
-        );
-        
-        if (success) {
-          Get.snackbar(
-            'Success',
-            'Profile created successfully',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
-          );
-          // Navigate back to profile page
-          Get.back();
-        } else {
-          Get.snackbar(
-            'Error',
-            'Failed to create profile: ${_profileController.error.value}',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.red,
             colorText: Colors.white,

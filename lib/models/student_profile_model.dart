@@ -1,82 +1,83 @@
 class StudentProfileModel {
   final String? userId;
   final String? fullName;
-  final int? institutionId;
-  final String? identityCardBase64;
-  final String? identityNumber;
-  final String? email;
-  final String? profilePicture;
+  final String email;
+  final String? profilePhotoUrl;
   final String? shortBio;
-  final int? departmentOrProgramId;
-  final int? facultyOrDisciplineId;
-  final int? yearOfStudy;
-  final int? id; // For retrieved profiles
+  final AcadmicProfileDetails? academicDetails;
 
   StudentProfileModel({
     this.userId,
     this.fullName,
-    this.institutionId,
-    this.identityCardBase64,
-    this.identityNumber,
-    this.email,
-    this.profilePicture,
+    this.email = '',
+    this.profilePhotoUrl,
     this.shortBio,
-    this.departmentOrProgramId,
-    this.facultyOrDisciplineId,
-    this.yearOfStudy,
-    this.id,
+    this.academicDetails,
   });
 
   factory StudentProfileModel.fromJson(Map<String, dynamic> json) {
+    print('StudentProfileModel.fromJson: $json');
     return StudentProfileModel(
       userId: json['userId'],
       fullName: json['fullName'],
-      institutionId: json['institutionId'],
-      identityCardBase64: json['identityCardBase64'],
-      identityNumber: json['identityNumber'],
       email: json['email'],
-      profilePicture: json['profilePicture'],
+      profilePhotoUrl: json['profilePhotoUrl'],
       shortBio: json['shortBio'],
-      departmentOrProgramId: json['departmentOrProgramId'],
-      facultyOrDisciplineId: json['facultyOrDisciplineId'],
-      yearOfStudy: json['yearOfStudy'],
-      id: json['id'],
+      academicDetails:
+          json['academic'] != null
+              ? AcadmicProfileDetails.fromJson(json['academic'])
+              : null,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = {
-      'userId': userId,
-      'fullName': fullName,
-      'institutionId': institutionId,
-      'identityCardBase64': identityCardBase64,
-      'identityNumber': identityNumber,
-      'email': email,
-      'profilePicture': profilePicture,
-      'shortBio': shortBio,
-      'departmentOrProgramId': departmentOrProgramId,
-      'facultyOrDisciplineId': facultyOrDisciplineId,
-      'yearOfStudy': yearOfStudy,
-    };
-    // Don't include id for create requests
-    if (id != null) {
-      data['id'] = id;
-    }
-    return data;
   }
 
   // For update requests
   Map<String, dynamic> toUpdateJson() {
     return {
       'fullName': fullName,
-      'identityCardBase64': identityCardBase64,
-      'identityNumber': identityNumber,
+      'identityCardBase64': academicDetails?.identityCardBase64,
+      'identityNumber': academicDetails?.identityNumber,
       'email': email,
-      'profilePicture': profilePicture,
+      'profilePicture': profilePhotoUrl,
       'shortBio': shortBio,
-      'departmentOrProgramId': departmentOrProgramId,
-      'facultyOrDisciplineId': facultyOrDisciplineId,
-      'yearOfStudy': yearOfStudy,
+      'departmentOrProgramId': academicDetails?.departmentOrProgramId,
+      'facultyOrDisciplineId': academicDetails?.facultyOrDisciplineId,
+      'yearOfStudy': academicDetails?.yearOfStudy,
     };
+  }
+}
+
+class AcadmicProfileDetails {
+  final int institutionId;
+  final String institutionName;
+  final int facultyOrDisciplineId;
+  final String facultyOrDisciplineName;
+  final int departmentOrProgramId;
+  final String departmentOrProgramName;
+  final int yearOfStudy;
+  final String? identityCardBase64;
+  final String? identityNumber;
+
+  AcadmicProfileDetails({
+    required this.institutionId,
+    required this.institutionName,
+    required this.facultyOrDisciplineId,
+    required this.facultyOrDisciplineName,
+    required this.departmentOrProgramId,
+    required this.departmentOrProgramName,
+    required this.yearOfStudy,
+    this.identityCardBase64,
+    this.identityNumber,
+  });
+
+  factory AcadmicProfileDetails.fromJson(Map<String, dynamic> json) {
+    return AcadmicProfileDetails(
+      institutionId: json['institutionId'],
+      institutionName: json['institutionName'],
+      facultyOrDisciplineId: json['facultyOrDisciplineId'],
+      facultyOrDisciplineName: json['facultyOrDisciplineName'],
+      departmentOrProgramId: json['departmentOrProgramId'],
+      departmentOrProgramName: json['departmentOrProgramName'],
+      yearOfStudy: json['yearOfStudy'],
+    );
   }
 }

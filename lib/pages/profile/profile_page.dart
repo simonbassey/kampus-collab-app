@@ -347,10 +347,10 @@ class _ProfilePageState extends State<ProfilePage>
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF5796FF), width: 3),
                   image:
-                      profile?.profilePicture != null
+                      profile?.profilePhotoUrl != null
                           ? DecorationImage(
                             image: MemoryImage(
-                              _convertBase64ToImage(profile!.profilePicture!),
+                              _convertBase64ToImage(profile!.profilePhotoUrl!),
                             ),
                             fit: BoxFit.cover,
                           )
@@ -385,7 +385,7 @@ class _ProfilePageState extends State<ProfilePage>
           ),
           const SizedBox(height: 16),
           Text(
-            'User @${profile?.email?.split('@').first ?? 'Anonymous'}',
+            '${profile?.fullName} @${profile?.email?.split('@').first ?? 'Anonymous'}',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
