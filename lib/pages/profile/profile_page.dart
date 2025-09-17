@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../../controllers/student_profile_controller.dart';
 import '../../controllers/auth_controller.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'edit_profile_page.dart';
+import '../../widgets/profile_photo_viewer.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -155,7 +158,7 @@ class _ProfilePageState extends State<ProfilePage>
             icon: const Icon(Icons.more_vert, color: Color(0xff333333)),
             onSelected: (value) {
               if (value == 'edit') {
-                Get.toNamed('/profile-setup');
+                Get.to(() => const EditProfilePage());
               } else if (value == 'logout') {
                 _showLogoutConfirmation(context);
               } else if (value == 'start-live') {
@@ -315,7 +318,7 @@ class _ProfilePageState extends State<ProfilePage>
                 _buildProfileHeader(),
                 const SizedBox(height: 24),
                 _buildFollowSection(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 50),
                 _buildTabBar(),
                 _buildTabContent(),
               ],
@@ -340,31 +343,39 @@ class _ProfilePageState extends State<ProfilePage>
           // Profile avatar
           Stack(
             children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF5796FF), width: 3),
-                  image:
-                      profile?.profilePhotoUrl != null
-                          ? DecorationImage(
-                            image: MemoryImage(
-                              _convertBase64ToImage(profile!.profilePhotoUrl!),
-                            ),
-                            fit: BoxFit.cover,
-                          )
-                          : const DecorationImage(
-                            image: AssetImage('assets/images/Group 13.png'),
-                            fit: BoxFit.cover,
-                          ),
+              GestureDetector(
+                onTap: () {
+                  _showExpandedProfilePhoto(profile);
+                },
+                child: Hero(
+                  tag: 'profile-photo-hero',
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF5796FF), width: 3),
+                      image:
+                          profile?.profilePhotoUrl != null
+                              ? DecorationImage(
+                                image: MemoryImage(
+                                  _convertBase64ToImage(profile!.profilePhotoUrl!),
+                                ),
+                                fit: BoxFit.cover,
+                              )
+                              : const DecorationImage(
+                                image: AssetImage('assets/images/Group 13.png'),
+                                fit: BoxFit.cover,
+                              ),
+                    ),
+                  ),
                 ),
               ),
               Positioned(
                 right: 0,
                 bottom: 0,
                 child: GestureDetector(
-                  onTap: () => Get.toNamed('/profile-setup'),
+                  onTap: () => Get.to(() => const EditProfilePage()),
                   child: Container(
                     width: 32,
                     height: 32,
@@ -384,15 +395,45 @@ class _ProfilePageState extends State<ProfilePage>
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            '${profile?.fullName} @${profile?.email?.split('@').first ?? 'Anonymous'}',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${profile?.fullName}',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.normal,
+                  letterSpacing: -0.41,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(width: 4),
+              Text(
+                '@${profile?.email?.split('@').first ?? 'Anonymous'}',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.normal,
+                  letterSpacing: -0.41,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
             profile?.shortBio ?? 'No bio available',
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w500,
+              fontStyle: FontStyle.normal,
+              fontSize: 14,
+              letterSpacing: -0.41,
+              color: const Color(0xFF4A4A4A),
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -403,6 +444,30 @@ class _ProfilePageState extends State<ProfilePage>
   // Helper method to convert base64 string to image bytes
   Uint8List _convertBase64ToImage(String base64String) {
     return base64Decode(base64String);
+  }
+  
+  // Method to show expanded profile photo
+  void _showExpandedProfilePhoto(dynamic profile) {
+    if (profile?.profilePhotoUrl != null) {
+      // Show the profile photo from base64 data
+      final imageData = _convertBase64ToImage(profile.profilePhotoUrl!);
+      showDialog(
+        context: context,
+        builder: (context) => ProfilePhotoViewer(
+          photoData: imageData,
+          isAssetImage: false,
+        ),
+      );
+    } else {
+      // Show the default avatar
+      showDialog(
+        context: context,
+        builder: (context) => ProfilePhotoViewer(
+          photoData: 'assets/images/Group 13.png',
+          isAssetImage: true,
+        ),
+      );
+    }
   }
 
   Widget _buildFollowSection() {
@@ -444,6 +509,16 @@ class _ProfilePageState extends State<ProfilePage>
         unselectedLabelColor: Colors.grey,
         indicatorColor: const Color(0xFF5796FF),
         indicatorWeight: 3,
+        labelStyle: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          fontFamily: 'Inter',
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          fontFamily: 'Inter',
+        ),
         tabs: const [
           Tab(text: 'Blog Posts'),
           Tab(text: 'Saved'),
@@ -454,77 +529,182 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildTabContent() {
-    return SizedBox(
-      height: 400, // Adjust height as needed
-      child: TabBarView(
-        controller: _tabController,
-        children: [_buildBlogPostsTab(), _buildSavedTab(), _buildProjectsTab()],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 60, // Space for tab content
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildBlogPostsTab(),
+              _buildSavedTab(),
+              _buildProjectsTab(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 30),
+        _buildEducationSection(),
+        const SizedBox(height: 30),
+        _buildSkillsSection(),
+      ],
     );
   }
 
   Widget _buildBlogPostsTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Text(
-            '0 post',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-          ),
-        ],
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(
+          '0 post',
+          style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+        ),
       ),
     );
   }
 
   Widget _buildSavedTab() {
-    return const Center(child: Text('No saved items yet'));
-  }
-
-  Widget _buildProjectsTab() {
-    return const Center(child: Text('No projects yet'));
-  }
-
-  Widget _buildEducationSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Education',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(
+          'No saved items',
+          style: TextStyle(fontSize: 15, color: Colors.grey[600]),
         ),
-        const SizedBox(height: 12),
-        _buildEducationItem(
-          'University Of Cross River State',
-          'Computer Science',
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildEducationItem(String institution, String field) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+  Widget _buildProjectsTab() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(
+          'No projects',
+          style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEducationSection() {
+    return Obx(() {
+      final profile = _profileController.studentProfile.value;
+      final academic = profile?.academicDetails;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.school, color: Colors.grey[600]),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const Text(
+            'Education',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              fontStyle: FontStyle.normal,
+              letterSpacing: -0.41,
+              color: Color(0xFF333333),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Check if academic data exists
+          if (academic != null &&
+              academic.institutionName.isNotEmpty &&
+              academic.departmentOrProgramName.isNotEmpty)
+            // Display actual academic data
+            _buildEducationItem(
+              institution: academic.institutionName,
+              field: academic.departmentOrProgramName,
+              institutionSvg: 'assets/icons/flaculty.svg',
+              fieldSvg: 'assets/icons/department.svg',
+              fieldIconFallback: Icons.school_outlined,
+              institutionIconFallback: Icons.school_outlined,
+            )
+          else
+            // Display placeholder when data is missing
+            _buildEducationItem(
+              institution: 'Add your institution',
+              field: 'Add your program/department',
+              institutionSvg: 'assets/icons/flaculty.svg',
+              fieldSvg: 'assets/icons/department.svg',
+              fieldIconFallback: Icons.school_outlined,
+              institutionIconFallback: Icons.school_outlined,
+            ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildEducationItem({
+    required String institution,
+    required String field,
+    String? institutionSvg,
+    String? fieldSvg,
+    IconData institutionIconFallback = Icons.school,
+    IconData fieldIconFallback = Icons.subject,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Institution with icon
+          Row(
             children: [
+              institutionSvg != null
+                  ? SvgPicture.asset(institutionSvg, width: 18, height: 18)
+                  : Icon(
+                    institutionIconFallback,
+                    color: Colors.grey[600],
+                    size: 18,
+                  ),
+              const SizedBox(width: 12),
               Text(
                 institution,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.normal,
+                  fontSize: 14,
+                  height: 22 / 14,
+                  letterSpacing: -0.41,
+                  color: Color(0xFF606060),
                 ),
               ),
-              Text(
-                field,
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
             ],
+          ),
+
+          // Program with icon
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                fieldSvg != null
+                    ? SvgPicture.asset(fieldSvg, width: 16, height: 16)
+                    : Icon(
+                      fieldIconFallback,
+                      color: Colors.grey[600],
+                      size: 18,
+                    ),
+                const SizedBox(width: 12),
+                Text(
+                  field,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.normal,
+                    fontSize: 14,
+                    height: 22 / 14,
+                    letterSpacing: -0.41,
+                    color: Color(0xFF606060),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -532,39 +712,110 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildSkillsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Skill as a service',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return Obx(() {
+      final profile = _profileController.studentProfile.value;
+
+      // In the future, we'll get skills from the API
+      // For now, using placeholder data
+      List<String> skills = ['Tailoring']; // Example skills
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Skill as a service',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.normal,
+                  letterSpacing: -0.41,
+                  color: Color(0xFF333333),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  // In future: Navigate to skill editing page
+                },
+                child: SvgPicture.asset(
+                  'assets/icons/edit.svg',
+                  width: 18,
+                  height: 18,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (skills.isNotEmpty)
+            ...skills.map(
+              (skill) => _buildSkillItem(
+                skill: skill,
+                skillSvg: 'assets/icons/service.svg',
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: () {
+                // In future: Navigate to add skills page
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      size: 18,
+                      color: Color(0xFF5796FF),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Add your skills',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.normal,
+                        fontSize: 14,
+                        height: 22 / 14,
+                        letterSpacing: -0.41,
+                        color: Color(0xFF5796FF),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit, size: 18),
-              onPressed: () {},
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildSkillItem('Tailoring'),
-        _buildSkillItem('Tailoring'),
-      ],
-    );
+        ],
+      );
+    });
   }
 
-  Widget _buildSkillItem(String skill) {
+  Widget _buildSkillItem({
+    required String skill,
+    String? skillSvg,
+    IconData iconFallback = Icons.check_circle_outline,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(Icons.check_circle, color: Colors.grey[600]),
+          skillSvg != null
+              ? SvgPicture.asset(skillSvg, width: 18, height: 18)
+              : Icon(iconFallback, color: Colors.grey[600], size: 18),
           const SizedBox(width: 12),
           Text(
             skill,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w400,
+              fontStyle: FontStyle.normal,
+              fontSize: 14,
+              height: 22 / 14,
+              letterSpacing: -0.41,
+              color: Color(0xFF606060),
+            ),
           ),
         ],
       ),
