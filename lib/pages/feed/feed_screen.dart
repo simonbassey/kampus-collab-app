@@ -10,6 +10,7 @@ import 'post_components/text_post.dart';
 import 'post_components/image_post.dart';
 import 'post_components/link_post.dart';
 import '../../models/post_model.dart';
+import '../../controllers/post_controller.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -19,12 +20,19 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  final List<PostModel> _posts = [];
-  bool _isLoading = false;
+  // Use GetX controller for posts
+  late PostController _postController;
+  
+  // For local state
+  List<PostModel> get _posts => _postController.posts;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize post controller
+    _postController = Get.put(PostController());
+    
     // Check if profile needs setup - delay to ensure context is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ProfileSetupModal.show(context);
@@ -32,37 +40,63 @@ class _FeedScreenState extends State<FeedScreen> {
     });
   }
 
-  void _loadPosts() {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Simulate loading posts from API
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() {
-        _posts.addAll([
+  void _loadPosts() async {
+    try {
+      // Use the actual API endpoint
+      await _postController.loadPosts();
+      
+      // If no posts are returned from API, add some mock posts for testing
+      if (_posts.isEmpty) {
+        // Add mock posts for testing until the API returns actual data
+        _postController.posts.addAll([
           PostModel.mockText(),
           PostModel.mockImage(),
           PostModel.mockLink(),
           PostModel.mockText(),
         ]);
-        _isLoading = false;
-      });
-    });
+      }
+    } catch (error) {
+      print('Error loading posts: $error');
+      
+      // Show error message to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load posts: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  void _refreshPosts() {
-    setState(() {
-      _posts.clear();
-    });
+  void _refreshPosts() async {
+    _postController.posts.clear();
     _loadPosts();
   }
 
-  void _handleNewPost(PostModel post) {
-    setState(() {
-      // Add the new post at the beginning of the list
-      _posts.insert(0, post);
-    });
+  // Handle creating a new post
+  void _handleNewPost(PostModel post) async {
+    try {
+      // Use the API to create the post
+      final newPost = await _postController.createPost(
+        content: post.content,
+        contentType: post.type == PostType.image ? 'Image' : 
+                    post.type == PostType.link ? 'Link' : 'Text',
+        mediaUrls: post.images,
+      );
+      
+      // If API call fails, fall back to adding the local post
+      if (newPost == null) {
+        _postController.posts.insert(0, post);
+      }
+    } catch (error) {
+      // In case of error, add the post locally anyway
+      _postController.posts.insert(0, post);
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Post saved locally. Could not sync with server: $error')),
+      );
+    }
   }
 
   Widget _buildPostByType(PostModel post) {
@@ -98,10 +132,13 @@ class _FeedScreenState extends State<FeedScreen> {
                 onRefresh: () async {
                   _refreshPosts();
                 },
-                child:
-                    _posts.isEmpty && _isLoading
-                        ? Center(child: CircularProgressIndicator())
-                        : ListView(
+                // Use Obx for reactive UI updates
+                child: Obx(() {
+                  if (_postController.isLoading.value && _postController.posts.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  return ListView(
                           children: [
                             // First post (if available)
                             if (_posts.isNotEmpty)
@@ -154,7 +191,8 @@ class _FeedScreenState extends State<FeedScreen> {
                                       ),
                             ),
                           ],
-                        ),
+                        );
+                  }), // Close the Obx
               ),
             ),
           ],

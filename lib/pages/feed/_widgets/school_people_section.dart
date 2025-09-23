@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
 import 'dart:ui';
 import '../../../models/school_person_model.dart';
+import '../../../widgets/safe_svg.dart';
 import '../../profile/view_profile_page.dart';
 
 class SchoolPeopleSection extends StatefulWidget {
@@ -21,17 +21,32 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
     _loadPeople();
   }
 
+  // To store the mounted status when initiating async operations
+  bool _mounted = true;
+  
+  @override
+  void dispose() {
+    // Mark as unmounted
+    _mounted = false;
+    super.dispose();
+  }
+  
   void _loadPeople() {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
 
     // In a real app, this would be an API call
     Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        _people = SchoolPersonModel.getMockPersons();
-        _isLoading = false;
-      });
+      // Check if still mounted before calling setState
+      if (_mounted) {
+        setState(() {
+          _people = SchoolPersonModel.getMockPersons();
+          _isLoading = false;
+        });
+      }
     });
   }
 
@@ -74,23 +89,16 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
             ),
             child: Row(
               children: [
-                // Try to use SVG icon with fallback to regular icon
-                Builder(
-                  builder: (context) {
-                    try {
-                      return SvgPicture.asset(
-                        'assets/icons/combo shape.svg',
-                        width: 20,
-                        height: 20,
-                      );
-                    } catch (e) {
-                      return Icon(
-                        Icons.people,
-                        size: 20,
-                        color: Colors.black87,
-                      );
-                    }
-                  },
+                // Use SafeSvg which handles errors properly
+                SafeSvg.asset(
+                  'assets/icons/combo shape.svg',
+                  width: 20,
+                  height: 20,
+                  errorBuilder: (context) => Icon(
+                    Icons.people,
+                    size: 20,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(

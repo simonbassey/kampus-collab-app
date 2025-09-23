@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../models/post_model.dart';
+import '../../../controllers/post_controller.dart';
 import 'post_detail_screen.dart';
 import '../../../pages/profile/view_profile_page.dart';
 
@@ -23,11 +25,14 @@ class PostBase extends StatefulWidget {
 
 class _PostBaseState extends State<PostBase> {
   late PostModel post;
+  late PostController _postController;
 
   @override
   void initState() {
     super.initState();
     post = widget.post;
+    // Get the post controller
+    _postController = Get.find<PostController>();
   }
 
   @override
@@ -202,7 +207,8 @@ class _PostBaseState extends State<PostBase> {
     );
   }
 
-  void _handleLike() {
+  void _handleLike() async {
+    // Optimistic update for responsive UI
     setState(() {
       if (post.isLiked) {
         post.likes--;
@@ -212,6 +218,36 @@ class _PostBaseState extends State<PostBase> {
         post.isLiked = true;
       }
     });
+    
+    try {
+      // Call API in the background
+      bool success;
+      if (post.isLiked) {
+        success = await _postController.likePost(post.id);
+      } else {
+        success = await _postController.unlikePost(post.id);
+      }
+      
+      // If API call failed, revert the optimistic update
+      if (!success) {
+        setState(() {
+          if (post.isLiked) {
+            post.likes--;
+            post.isLiked = false;
+          } else {
+            post.likes++;
+            post.isLiked = true;
+          }
+        });
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update like status')),
+        );
+      }
+    } catch (e) {
+      print('Error handling like: $e');
+    }
   }
 
   void _handleComment() {
@@ -232,15 +268,47 @@ class _PostBaseState extends State<PostBase> {
     ).showSnackBar(const SnackBar(content: Text('Post shared!')));
   }
 
-  void _handleBookmark() {
+  void _handleBookmark() async {
+    // Optimistic update for responsive UI
+    final wasBookmarked = post.isBookmarked;
     setState(() {
-      post.isBookmarked = !post.isBookmarked;
+      post.isBookmarked = !wasBookmarked;
     });
 
+    // Show feedback to user
     if (post.isBookmarked) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Post saved to bookmarks')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post saved to bookmarks'))
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post removed from bookmarks'))
+      );
+    }
+    
+    try {
+      // Call API in the background
+      bool success;
+      if (post.isBookmarked) {
+        success = await _postController.bookmarkPost(post.id);
+      } else {
+        success = await _postController.unbookmarkPost(post.id);
+      }
+      
+      // If API call failed, revert the optimistic update
+      if (!success) {
+        setState(() {
+          post.isBookmarked = wasBookmarked;
+        });
+        
+        // Show error message
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update bookmark status')),
+        );
+      }
+    } catch (e) {
+      print('Error handling bookmark: $e');
     }
   }
 
