@@ -8,12 +8,16 @@ class PostList extends StatelessWidget {
   final List<PostModel> posts;
   final bool isLoading;
   final Function()? onRefresh;
+  final bool shrinkWrap;
+  final ScrollPhysics? physics;
 
   const PostList({
     Key? key,
     required this.posts,
     this.isLoading = false,
     this.onRefresh,
+    this.shrinkWrap = false,
+    this.physics,
   }) : super(key: key);
 
   @override
@@ -34,6 +38,8 @@ class PostList extends StatelessWidget {
       },
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        physics: physics,
+        shrinkWrap: shrinkWrap,
         itemCount: posts.length,
         separatorBuilder:
             (context, index) => Divider(

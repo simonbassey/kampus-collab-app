@@ -354,12 +354,17 @@ class _ProfilePageState extends State<ProfilePage>
                     height: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF5796FF), width: 3),
+                      border: Border.all(
+                        color: const Color(0xFF5796FF),
+                        width: 3,
+                      ),
                       image:
                           profile?.profilePhotoUrl != null
                               ? DecorationImage(
                                 image: MemoryImage(
-                                  _convertBase64ToImage(profile!.profilePhotoUrl!),
+                                  _convertBase64ToImage(
+                                    profile!.profilePhotoUrl!,
+                                  ),
                                 ),
                                 fit: BoxFit.cover,
                               )
@@ -445,7 +450,7 @@ class _ProfilePageState extends State<ProfilePage>
   Uint8List _convertBase64ToImage(String base64String) {
     return base64Decode(base64String);
   }
-  
+
   // Method to show expanded profile photo
   void _showExpandedProfilePhoto(dynamic profile) {
     if (profile?.profilePhotoUrl != null) {
@@ -453,37 +458,43 @@ class _ProfilePageState extends State<ProfilePage>
       final imageData = _convertBase64ToImage(profile.profilePhotoUrl!);
       showDialog(
         context: context,
-        builder: (context) => ProfilePhotoViewer(
-          photoData: imageData,
-          isAssetImage: false,
-        ),
+        builder:
+            (context) =>
+                ProfilePhotoViewer(photoData: imageData, isAssetImage: false),
       );
     } else {
       // Show the default avatar
       showDialog(
         context: context,
-        builder: (context) => ProfilePhotoViewer(
-          photoData: 'assets/images/Group 13.png',
-          isAssetImage: true,
-        ),
+        builder:
+            (context) => ProfilePhotoViewer(
+              photoData: 'assets/images/Group 13.png',
+              isAssetImage: true,
+            ),
       );
     }
   }
 
   Widget _buildFollowSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildFollowColumn('Following', '0'),
-        Container(
-          height: 24,
-          width: 1,
-          color: Colors.grey[300],
-          margin: const EdgeInsets.symmetric(horizontal: 32),
-        ),
-        _buildFollowColumn('Followers', '0'),
-      ],
-    );
+    return Obx(() {
+      final profile = _profileController.studentProfile.value;
+      final followingCount = profile?.followingCount != null ? profile!.followingCount.toString() : '0';
+      final followerCount = profile?.followerCount != null ? profile!.followerCount.toString() : '0';
+      
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildFollowColumn('Following', followingCount),
+          Container(
+            height: 24,
+            width: 1,
+            color: Colors.grey[300],
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+          ),
+          _buildFollowColumn('Followers', followerCount),
+        ],
+      );
+    });
   }
 
   Widget _buildFollowColumn(String label, String count) {
@@ -738,7 +749,7 @@ class _ProfilePageState extends State<ProfilePage>
               ),
               GestureDetector(
                 onTap: () {
-                  // In future: Navigate to skill editing page
+                  Get.to(() => const EditProfilePage());
                 },
                 child: SvgPicture.asset(
                   'assets/icons/edit.svg',
@@ -759,7 +770,7 @@ class _ProfilePageState extends State<ProfilePage>
           else
             GestureDetector(
               onTap: () {
-                // In future: Navigate to add skills page
+                Get.to(() => const EditProfilePage());
               },
               child: Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 10),

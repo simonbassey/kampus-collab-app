@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import '../../../models/post_model.dart';
 import 'post_detail_screen.dart';
-import '../../../pages/profile/user_profile_screen.dart';
+import '../../../pages/profile/view_profile_page.dart';
 
 class PostBase extends StatefulWidget {
   final PostModel post;
@@ -215,10 +215,11 @@ class _PostBaseState extends State<PostBase> {
   }
 
   void _handleComment() {
-    // Navigate to comments view
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Comments feature coming soon!')),
-    );
+    // Navigate to post details screen where comments can be made
+    // Set focusCommentInput to true to trigger keyboard automatically
+    if (!widget.isInDetailScreen) {
+      PostDetailScreen.show(context, post, focusCommentInput: true);
+    }
   }
 
   void _handleShare() {
@@ -245,7 +246,7 @@ class _PostBaseState extends State<PostBase> {
 
   void _navigateToUserProfile() {
     // Navigate to the user profile screen
-    UserProfileScreen.showProfile(context, post);
+    ViewProfilePage.showProfile(context, post);
   }
 
   void _showPostOptions() {

@@ -229,6 +229,10 @@ class StudentProfileController extends GetxController {
         email: email ?? studentProfile.value!.email,
         profilePhotoUrl: profilePictureBase64,
         shortBio: shortBio ?? studentProfile.value!.shortBio,
+        // Preserve existing follower and following counts
+        followerCount: studentProfile.value!.followerCount,
+        followingCount: studentProfile.value!.followingCount,
+        postCount: studentProfile.value!.postCount,
         academicDetails: AcadmicProfileDetails(
           institutionId:
               studentProfile.value!.academicDetails?.institutionId ?? 0,
@@ -392,6 +396,9 @@ class StudentProfileController extends GetxController {
       'Has Identity Card: ${profile.academicDetails?.identityCardBase64 != null}',
     );
     print('Has Profile Picture: ${profile.profilePhotoUrl != null}');
+    print('Follower Count: ${profile.followerCount}');
+    print('Following Count: ${profile.followingCount}');
+    print('Post Count: ${profile.postCount}');
     print('=============== END PROFILE DETAILS ===============');
   }
 }

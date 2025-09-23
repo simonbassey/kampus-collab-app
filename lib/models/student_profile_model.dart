@@ -5,6 +5,9 @@ class StudentProfileModel {
   final String? profilePhotoUrl;
   final String? shortBio;
   final AcadmicProfileDetails? academicDetails;
+  final int followerCount;
+  final int followingCount;
+  final int postCount;
 
   StudentProfileModel({
     this.userId,
@@ -13,6 +16,9 @@ class StudentProfileModel {
     this.profilePhotoUrl,
     this.shortBio,
     this.academicDetails,
+    this.followerCount = 0,
+    this.followingCount = 0,
+    this.postCount = 0,
   });
 
   factory StudentProfileModel.fromJson(Map<String, dynamic> json) {
@@ -27,6 +33,9 @@ class StudentProfileModel {
           json['academic'] != null
               ? AcadmicProfileDetails.fromJson(json['academic'])
               : null,
+      followerCount: json['followerCount'] ?? 0,
+      followingCount: json['followingCount'] ?? 0,
+      postCount: json['postCount'] ?? 0,
     );
   }
 

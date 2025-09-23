@@ -9,12 +9,20 @@ import 'image_viewer.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
+  final bool focusCommentInput;
 
-  const PostDetailScreen({Key? key, required this.post}) : super(key: key);
+  const PostDetailScreen({
+    Key? key, 
+    required this.post,
+    this.focusCommentInput = false,
+  }) : super(key: key);
 
-  static void show(BuildContext context, PostModel post) {
+  static void show(BuildContext context, PostModel post, {bool focusCommentInput = false}) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)),
+      MaterialPageRoute(builder: (context) => PostDetailScreen(
+        post: post,
+        focusCommentInput: focusCommentInput,
+      )),
     );
   }
 
@@ -25,6 +33,7 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   late PostModel post;
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   bool _isSubmittingComment = false;
   final List<CommentModel> _comments = [];
   CommentModel? _replyingTo;
@@ -34,6 +43,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.initState();
     post = widget.post;
     _loadComments();
+    
+    // Focus on comment input if requested (after small delay for animation)
+    if (widget.focusCommentInput) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _commentFocusNode.requestFocus();
+        });
+      });
+    }
   }
 
   void _loadComments() {
@@ -60,6 +78,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   void dispose() {
     _commentController.dispose();
+    _commentFocusNode.dispose();
     super.dispose();
   }
 
@@ -201,8 +220,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   onReply: (comment) {
                     setState(() {
                       _replyingTo = comment;
-                      // Focus the comment input
-                      FocusScope.of(context).requestFocus(FocusNode());
+                    });
+                    // Focus the comment input with a short delay
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      _commentFocusNode.requestFocus();
                     });
                   },
                   showReplies: true,
@@ -240,6 +261,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Expanded(
             child: TextField(
               controller: _commentController,
+              focusNode: _commentFocusNode,
               decoration: const InputDecoration(
                 hintText: 'Add a comment...',
                 border: OutlineInputBorder(

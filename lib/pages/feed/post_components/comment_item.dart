@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/post_model.dart';
-import '../../../pages/profile/user_profile_screen.dart';
+import '../../../pages/profile/view_profile_page.dart';
 
 class CommentModel {
   final String id;
@@ -100,7 +100,7 @@ class _CommentItemState extends State<CommentItem> {
       type: PostType.text,
     );
     
-    UserProfileScreen.showProfile(context, mockPost);
+    ViewProfilePage.showProfile(context, mockPost);
   }
   
   @override
