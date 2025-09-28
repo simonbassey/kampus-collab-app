@@ -82,8 +82,8 @@ class AcadmicProfileDetails {
     return AcadmicProfileDetails(
       institutionId: json['institutionId'],
       institutionName: json['institutionName'],
-      facultyOrDisciplineId: json['facultyOrDisciplineId'],
-      facultyOrDisciplineName: json['facultyOrDisciplineName'],
+      facultyOrDisciplineId: json['facultyId'],
+      facultyOrDisciplineName: json['facultyName'],
       departmentOrProgramId: json['departmentOrProgramId'],
       departmentOrProgramName: json['departmentOrProgramName'],
       yearOfStudy: json['yearOfStudy'],
