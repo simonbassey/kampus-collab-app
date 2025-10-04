@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import '../../constants/api.dart';
+import '../../controllers/auth_controller.dart';
 import '../../controllers/student_profile_controller.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -23,9 +26,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _studentIdController = TextEditingController();
+  // Academic field controllers removed as requested
 
   // For the skills/interests
-  final List<String> _skills = ['Tailoring'];
+  final List<String> _skills = [];
   final TextEditingController _newSkillController = TextEditingController();
 
   // For profile picture
@@ -55,15 +59,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (profile != null) {
       _bioController.text = profile.shortBio ?? '';
       _emailController.text = profile.email;
-      // Add these fields when the model supports them
-      //_phoneController.text = profile.phoneNumber ?? '';
-      //_studentIdController.text = profile.academicDetails?.identityNumber ?? '';
 
-      // Placeholder for skills, would come from the API in future
+      // Load identity number (student ID)
+      _studentIdController.text =
+          profile.identityNumber ??
+          profile.academicDetails?.identityNumber ??
+          '';
+
+      // TODO: Add phone number when API supports it
+      //_phoneController.text = profile.phoneNumber ?? '';
+
+      // Academic fields removed as requested
+
+      // Placeholder for skills - would ideally come from an API
       setState(() {
         _skills.clear();
-        // Will add real skills when available from API
-        _skills.add('Tailoring');
+        if (profile.shortBio?.isNotEmpty == true) {
+          // Just as a demo, extract words from bio that might be skills
+          // In a real app, skills would come from a separate API field
+          final words = profile.shortBio!.split(' ');
+          for (final word in words) {
+            if (word.length > 5 && !_skills.contains(word)) {
+              _skills.add(word);
+            }
+          }
+        }
+
+        // No default skills needed
+        if (_skills.isEmpty) {
+          // Skills will be added by the user
+        }
       });
     }
   }
@@ -100,32 +125,92 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _saveProfile() async {
+    // No validations needed - academic fields removed
+
     // Show loading indicator
     Get.dialog(
       const Center(child: CircularProgressIndicator(color: Color(0xFF5796FF))),
       barrierDismissible: false,
     );
 
+    // Academic fields removed as requested
+
     // Log the request payload for debugging
     final requestPayload = {
-      'fullName': null, // Not updating in this screen
-      'email': _emailController.text,
+      // Email is not editable so we don't include it in the update payload
       'shortBio': _bioController.text,
+      'identityNumber':
+          _studentIdController.text.isNotEmpty
+              ? _studentIdController.text
+              : null,
       'hasProfileImage': _profileImage != null,
       'skills': _skills,
     };
     print('API Request payload: $requestPayload');
 
     try {
-      // Update profile
-      final success = await _profileController.updateProfile(
-        fullName: null, // Not updating the name in this screen
-        email: _emailController.text,
+      // First try using the standard update method which now includes create-if-not-exists logic
+      bool success = await _profileController.updateProfileWithNewAPI(
         shortBio: _bioController.text,
+        identityNumber:
+            _studentIdController.text.isNotEmpty
+                ? _studentIdController.text
+                : null,
         profileImageFile: _profileImage,
-        // Other fields would be included here
-        // identityNumber: _studentIdController.text,
+        // Academic fields removed as requested
       );
+
+      // If the update failed for any reason, try our workaround
+      // The current error tends to be "Profile not found for update" despite the profile being available
+      if (!success) {
+        print('Attempting alternative approach due to profile not found');
+
+        // Create a minimal profile first to ensure it exists
+        final Map<String, dynamic> minimalProfileData = {
+          'shortBio': _bioController.text,
+        };
+
+        if (_studentIdController.text.isNotEmpty) {
+          minimalProfileData['identityNumber'] = _studentIdController.text;
+        }
+
+        try {
+          // Try a different approach - PUT directly to profile/me endpoint
+          // POST to /api/profile doesn't work (404)
+          final authController = Get.find<AuthController>();
+          final token = await authController.getAuthToken();
+          final apiUrl = '${ApiConstants.baseUrl}/api/profile/me';
+
+          print('REQUEST TYPE: PUT - Creating minimal profile at $apiUrl');
+          final putResponse = await http.put(
+            Uri.parse(apiUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(minimalProfileData),
+          );
+
+          print('PUT create profile status: ${putResponse.statusCode}');
+          print('PUT create profile response: ${putResponse.body}');
+
+          // Refresh profile data
+          await _profileController.fetchCurrentUserProfile();
+
+          // Try update again
+          success = await _profileController.updateProfileWithNewAPI(
+            shortBio: _bioController.text,
+            identityNumber:
+                _studentIdController.text.isNotEmpty
+                    ? _studentIdController.text
+                    : null,
+            profileImageFile: _profileImage,
+            // Academic fields removed as requested
+          );
+        } catch (e) {
+          print('Error in alternative profile creation: $e');
+        }
+      }
 
       // Log the result
       print('API Response success: $success');
@@ -342,12 +427,50 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 _buildProfileAvatar(profile),
                 const SizedBox(height: 24),
 
-                // Email
-                _buildFormField(
-                  'Email',
-                  'Your email address',
-                  _emailController,
-                  keyboardType: TextInputType.emailAddress,
+                // Email (Read-only)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Email',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _emailController,
+                      style: const TextStyle(fontSize: 16),
+                      readOnly: true, // Make it read-only
+                      enabled: false, // Visually show as disabled
+                      decoration: InputDecoration(
+                        hintText: 'Your email address',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 16,
+                        ),
+                        contentPadding: const EdgeInsets.only(
+                          bottom: 8,
+                          top: 4,
+                          left: 8,
+                        ),
+                        border: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        disabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey[200]!),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        isDense: true,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 
@@ -474,17 +597,32 @@ class _EditProfilePageState extends State<EditProfilePage> {
     TextEditingController controller, {
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    bool isRequired = false,
+    Function(String)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            if (isRequired)
+              Text(
+                ' *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.red,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         TextField(
@@ -511,7 +649,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
             filled: false,
             isDense: maxLines == 1,
           ),
-          onChanged: (_) => setState(() => _isFormChanged = true),
+          onChanged: (value) {
+            setState(() => _isFormChanged = true);
+            if (validator != null) {
+              validator(value);
+            }
+          },
         ),
       ],
     );

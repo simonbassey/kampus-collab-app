@@ -728,7 +728,7 @@ class _ProfilePageState extends State<ProfilePage>
 
       // In the future, we'll get skills from the API
       // For now, using placeholder data
-      List<String> skills = ['Tailoring']; // Example skills
+      List<String> skills = []; 
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

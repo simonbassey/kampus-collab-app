@@ -1,6 +1,6 @@
 import 'package:http/http.dart' as http;
 import '../controllers/auth_controller.dart';
-import '../utils/api_constants.dart';
+import '../constants/api.dart'; // Using production API constants
 import 'package:get/get.dart';
 
 class ApiService {
