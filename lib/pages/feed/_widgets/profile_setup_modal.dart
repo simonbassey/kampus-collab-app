@@ -1,16 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../controllers/student_profile_controller.dart';
 
 class ProfileSetupModal extends StatelessWidget {
   const ProfileSetupModal({Key? key}) : super(key: key);
 
+  // Check if profile needs setup
+  static bool _needsSetup(StudentProfileController controller) {
+    final profile = controller.studentProfile.value;
+
+    // If no profile at all, needs setup
+    if (profile == null) {
+      print('ProfileSetupModal: No profile found, needs setup');
+      return true;
+    }
+
+    // Check if ANY of the important fields are missing
+    final hasShortBio =
+        profile.shortBio != null && profile.shortBio!.isNotEmpty;
+    final hasAcademicDetails = profile.academicDetails != null;
+
+    // Show modal if ANY field is missing
+    if (!hasShortBio || !hasAcademicDetails) {
+      print(
+        'ProfileSetupModal: Profile incomplete - Bio: $hasShortBio, Academic: $hasAcademicDetails',
+      );
+      return true;
+    }
+
+    print('ProfileSetupModal: Profile is complete, no setup needed');
+    return false;
+  }
+
   // Show a modal dialog prompting the user to setup their profile
   static void show(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false, // User must take action
-      builder: (context) => const ProfileSetupModal(),
-    );
+    try {
+      final profileController = Get.find<StudentProfileController>();
+
+      // Only show if profile needs setup
+      if (_needsSetup(profileController)) {
+        showDialog(
+          context: context,
+          barrierDismissible: false, // User must take action
+          builder: (context) => const ProfileSetupModal(),
+        );
+      }
+    } catch (e) {
+      print('ProfileSetupModal: Error checking profile status: $e');
+      // If controller not found, don't show modal
+    }
   }
 
   @override
@@ -22,9 +60,7 @@ class ProfileSetupModal extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         contentPadding: const EdgeInsets.all(0),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
@@ -59,11 +95,7 @@ class ProfileSetupModal extends StatelessWidget {
                     label: 'Later',
                     onPressed: () => Navigator.of(context).pop(),
                   ),
-                  Container(
-                    height: 24,
-                    width: 1,
-                    color: Color(0xffE8E8E8),
-                  ),
+                  Container(height: 24, width: 1, color: Color(0xffE8E8E8)),
                   _ActionButton(
                     label: 'Setup',
                     onPressed: () {
@@ -85,11 +117,8 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
 
-  const _ActionButton({
-    Key? key,
-    required this.label,
-    required this.onPressed,
-  }) : super(key: key);
+  const _ActionButton({Key? key, required this.label, required this.onPressed})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {

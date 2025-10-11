@@ -5,10 +5,12 @@ import 'dart:io';
 import 'dart:typed_data'; // For Uint8List
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/student_profile_controller.dart';
+import '../../controllers/post_controller.dart';
 import '../../services/post_creation_service.dart';
 import '../profile/profile_page.dart';
 import '../../models/student_profile_model.dart';
 import '../../widgets/post_creation_toolbar.dart';
+import '../../utils/error_message_helper.dart';
 
 class CreatePostPage extends StatefulWidget {
   const CreatePostPage({Key? key}) : super(key: key);
@@ -750,36 +752,98 @@ class _CreatePostPageState extends State<CreatePostPage> {
     });
 
     try {
+      // Navigate to feed first
+      Get.back(); // Close create post page
+      Get.offAllNamed('/feed'); // Navigate to feed, clearing stack
+
+      // Now show progress on the feed screen using GetX snackbar at top
+      Get.showSnackbar(
+        GetSnackBar(
+          message: 'Creating your post...',
+          showProgressIndicator: true,
+          progressIndicatorBackgroundColor: Colors.white,
+          progressIndicatorValueColor: AlwaysStoppedAnimation<Color>(
+            Color(0xFF5796FF),
+          ),
+          duration: Duration(seconds: 10), // Will be dismissed manually
+          isDismissible: false,
+          backgroundColor: Colors.white,
+          borderRadius: 0,
+          margin: EdgeInsets.zero,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          messageText: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5796FF)),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'Creating your post...',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ),
+          snackPosition: SnackPosition.TOP,
+        ),
+      );
+
       // Create post using our post creation service
-      // Note: In a real app, you would upload the images to storage first
-      // and then pass their URLs to the createPost method
       await _postService.createPost(
         _postController.text,
         _visibility,
-        // Pass image paths or convert to base64 if your API requires it
         imagePaths: _selectedImages.map((file) => file.path).toList(),
       );
 
-      // Show success message
-      Get.snackbar(
-        'Success',
-        'Your post has been created!',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
+      // Dismiss progress snackbar
+      Get.closeCurrentSnackbar();
+
+      // Show success snackbar with linear progress
+      Get.showSnackbar(
+        GetSnackBar(
+          message: 'Post created successfully!',
+          icon: Icon(Icons.check_circle, color: Colors.white),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.green,
+          borderRadius: 0,
+          margin: EdgeInsets.zero,
+          snackPosition: SnackPosition.TOP,
+        ),
       );
 
-      // Close the page after posting
-      Get.back(result: true);
+      // Reload posts on the feed
+      try {
+        final postController = Get.find<PostController>();
+        await postController.loadPosts();
+      } catch (e) {
+        print('Error reloading posts: $e');
+      }
     } catch (e) {
+      // Dismiss progress snackbar
+      Get.closeCurrentSnackbar();
+
+      // Clean error message before showing to user
+      String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
+
       // Show error
-      Get.snackbar(
-        'Error',
-        'Failed to create post: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      Get.showSnackbar(
+        GetSnackBar(
+          message: cleanError,
+          icon: Icon(Icons.error, color: Colors.white),
+          duration: Duration(seconds: 3),
+          backgroundColor: Colors.red,
+          borderRadius: 0,
+          margin: EdgeInsets.zero,
+          snackPosition: SnackPosition.TOP,
+        ),
       );
     } finally {
       if (mounted) {

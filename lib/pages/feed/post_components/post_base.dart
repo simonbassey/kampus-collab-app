@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
 import '../../../models/post_model.dart';
 import '../../../controllers/post_controller.dart';
+import '../../../widgets/rich_text_content.dart';
+import '../../../widgets/url_link_preview.dart';
 import 'post_detail_screen.dart';
 import '../../../pages/profile/view_profile_page.dart';
 
@@ -26,6 +27,7 @@ class PostBase extends StatefulWidget {
 class _PostBaseState extends State<PostBase> {
   late PostModel post;
   late PostController _postController;
+  String? _detectedUrl;
 
   @override
   void initState() {
@@ -60,11 +62,25 @@ class _PostBaseState extends State<PostBase> {
               child: Column(
                 children: [
                   Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        post.content,
-                        style: const TextStyle(fontSize: 14.0),
+                      RichTextContent(
+                        content: post.content,
+                        style: const TextStyle(
+                          fontSize: 14.0,
+                          color: Colors.black87,
+                          height: 1.4,
+                        ),
+                        onUrlDetected: (url) {
+                          if (_detectedUrl != url) {
+                            setState(() {
+                              _detectedUrl = url;
+                            });
+                          }
+                        },
                       ),
+                      // Show URL preview if URL is detected
+                      if (_detectedUrl != null) UrlLinkPreview(url: _detectedUrl!),
                       if (widget.contentWidget != null) ...[
                         const SizedBox(height: 12.0),
                         widget.contentWidget!,
@@ -89,7 +105,15 @@ class _PostBaseState extends State<PostBase> {
           onTap: () => _navigateToUserProfile(),
           child: CircleAvatar(
             radius: 20.0,
-            backgroundImage: NetworkImage(post.userAvatar),
+            backgroundColor: Color(0xFFEEF5FF),
+            backgroundImage:
+                post.userAvatar.isNotEmpty && post.userAvatar.startsWith('http')
+                    ? NetworkImage(post.userAvatar)
+                    : null,
+            child:
+                post.userAvatar.isNotEmpty && post.userAvatar.startsWith('http')
+                    ? null
+                    : Icon(Icons.person, size: 24, color: Color(0xFF5796FF)),
           ),
         ),
         const SizedBox(width: 12.0),
@@ -218,7 +242,7 @@ class _PostBaseState extends State<PostBase> {
         post.isLiked = true;
       }
     });
-    
+
     try {
       // Call API in the background
       bool success;
@@ -227,7 +251,7 @@ class _PostBaseState extends State<PostBase> {
       } else {
         success = await _postController.unlikePost(post.id);
       }
-      
+
       // If API call failed, revert the optimistic update
       if (!success) {
         setState(() {
@@ -239,7 +263,7 @@ class _PostBaseState extends State<PostBase> {
             post.isLiked = true;
           }
         });
-        
+
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update like status')),
@@ -268,6 +292,8 @@ class _PostBaseState extends State<PostBase> {
     ).showSnackBar(const SnackBar(content: Text('Post shared!')));
   }
 
+  // Bookmark functionality - not currently used in UI
+  // ignore: unused_element
   void _handleBookmark() async {
     // Optimistic update for responsive UI
     final wasBookmarked = post.isBookmarked;
@@ -277,15 +303,15 @@ class _PostBaseState extends State<PostBase> {
 
     // Show feedback to user
     if (post.isBookmarked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post saved to bookmarks'))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Post saved to bookmarks')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Post removed from bookmarks'))
+        const SnackBar(content: Text('Post removed from bookmarks')),
       );
     }
-    
+
     try {
       // Call API in the background
       bool success;
@@ -294,13 +320,13 @@ class _PostBaseState extends State<PostBase> {
       } else {
         success = await _postController.unbookmarkPost(post.id);
       }
-      
+
       // If API call failed, revert the optimistic update
       if (!success) {
         setState(() {
           post.isBookmarked = wasBookmarked;
         });
-        
+
         // Show error message
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(

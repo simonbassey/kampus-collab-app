@@ -4,11 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import '../../constants/api.dart';
-import '../../controllers/auth_controller.dart';
 import '../../controllers/student_profile_controller.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import '../../utils/error_message_helper.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -21,19 +18,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final StudentProfileController _profileController =
       Get.find<StudentProfileController>();
 
-  // Form controllers
-  final TextEditingController _bioController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _studentIdController = TextEditingController();
-  // Academic field controllers removed as requested
+  // Form controllers - matching API parameters
+  final TextEditingController _shortBioController = TextEditingController();
+  final TextEditingController _identityNumberController =
+      TextEditingController();
+  final TextEditingController _academicEmailController =
+      TextEditingController();
 
-  // For the skills/interests
-  final List<String> _skills = [];
-  final TextEditingController _newSkillController = TextEditingController();
-
-  // For profile picture
+  // For profile picture and identity card
   File? _profileImage;
+  File? _identityCardImage;
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isFormChanged = false;
@@ -41,62 +35,74 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadProfileData();
+    _fetchAndLoadProfileData();
   }
 
   @override
   void dispose() {
-    _bioController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _studentIdController.dispose();
-    _newSkillController.dispose();
+    _shortBioController.dispose();
+    _identityNumberController.dispose();
+    _academicEmailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchAndLoadProfileData() async {
+    print('EditProfilePage: Fetching user profile data...');
+
+    try {
+      // Check if profile is already loaded (from preload service)
+      if (_profileController.studentProfile.value != null) {
+        print('EditProfilePage: Profile already loaded, using cached data');
+        _loadProfileData();
+        return;
+      }
+
+      // Fetch the latest profile data from the API
+      print('EditProfilePage: No cached data, fetching from API...');
+      await _profileController.fetchCurrentUserProfile();
+
+      // Load the data into form fields
+      if (mounted) {
+        _loadProfileData();
+      }
+    } catch (e) {
+      print('EditProfilePage: Error fetching profile: $e');
+      // Still try to load any cached data
+      if (mounted) {
+        _loadProfileData();
+      }
+    }
   }
 
   void _loadProfileData() {
     final profile = _profileController.studentProfile.value;
-    if (profile != null) {
-      _bioController.text = profile.shortBio ?? '';
-      _emailController.text = profile.email;
 
-      // Load identity number (student ID)
-      _studentIdController.text =
+    print('EditProfilePage: Loading profile data into form fields...');
+
+    if (profile != null) {
+      print('EditProfilePage: Profile found - ${profile.fullName}');
+
+      _shortBioController.text = profile.shortBio ?? '';
+      _identityNumberController.text =
           profile.identityNumber ??
           profile.academicDetails?.identityNumber ??
           '';
+      _academicEmailController.text = profile.email;
 
-      // TODO: Add phone number when API supports it
-      //_phoneController.text = profile.phoneNumber ?? '';
-
-      // Academic fields removed as requested
-
-      // Placeholder for skills - would ideally come from an API
-      setState(() {
-        _skills.clear();
-        if (profile.shortBio?.isNotEmpty == true) {
-          // Just as a demo, extract words from bio that might be skills
-          // In a real app, skills would come from a separate API field
-          final words = profile.shortBio!.split(' ');
-          for (final word in words) {
-            if (word.length > 5 && !_skills.contains(word)) {
-              _skills.add(word);
-            }
-          }
-        }
-
-        // No default skills needed
-        if (_skills.isEmpty) {
-          // Skills will be added by the user
-        }
-      });
+      print(
+        'EditProfilePage: Loaded - Bio: "${profile.shortBio}", ID: "${_identityNumberController.text}", Email: "${profile.email}"',
+      );
+    } else {
+      print('EditProfilePage: No profile data available');
     }
   }
 
   Future<void> _pickImage() async {
     final XFile? pickedFile = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 80,
+      maxWidth: 200,
+      maxHeight: 200,
+      imageQuality: 50,
     );
 
     if (pickedFile != null) {
@@ -107,109 +113,63 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  void _addSkill() {
-    if (_newSkillController.text.trim().isNotEmpty) {
+  Future<void> _pickIdentityCard() async {
+    final XFile? pickedFile = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 400,
+      maxHeight: 400,
+      imageQuality: 50,
+    );
+
+    if (pickedFile != null) {
       setState(() {
-        _skills.add(_newSkillController.text.trim());
-        _newSkillController.clear();
+        _identityCardImage = File(pickedFile.path);
         _isFormChanged = true;
       });
     }
   }
 
-  void _removeSkill(int index) {
-    setState(() {
-      _skills.removeAt(index);
-      _isFormChanged = true;
-    });
-  }
-
   Future<void> _saveProfile() async {
-    // No validations needed - academic fields removed
-
     // Show loading indicator
     Get.dialog(
       const Center(child: CircularProgressIndicator(color: Color(0xFF5796FF))),
       barrierDismissible: false,
     );
 
-    // Academic fields removed as requested
-
     // Log the request payload for debugging
     final requestPayload = {
-      // Email is not editable so we don't include it in the update payload
-      'shortBio': _bioController.text,
-      'identityNumber':
-          _studentIdController.text.isNotEmpty
-              ? _studentIdController.text
-              : null,
+      'shortBio': _shortBioController.text,
+      'identityNumber': _identityNumberController.text,
+      'academicEmail': _academicEmailController.text,
       'hasProfileImage': _profileImage != null,
-      'skills': _skills,
+      'hasIdentityCard': _identityCardImage != null,
     };
     print('API Request payload: $requestPayload');
 
     try {
-      // First try using the standard update method which now includes create-if-not-exists logic
       bool success = await _profileController.updateProfileWithNewAPI(
-        shortBio: _bioController.text,
+        shortBio:
+            _shortBioController.text.isNotEmpty
+                ? _shortBioController.text
+                : null,
         identityNumber:
-            _studentIdController.text.isNotEmpty
-                ? _studentIdController.text
+            _identityNumberController.text.isNotEmpty
+                ? _identityNumberController.text
+                : null,
+        academicEmail:
+            _academicEmailController.text.isNotEmpty
+                ? _academicEmailController.text
                 : null,
         profileImageFile: _profileImage,
-        // Academic fields removed as requested
+        idCardFile: _identityCardImage,
       );
 
-      // If the update failed for any reason, try our workaround
-      // The current error tends to be "Profile not found for update" despite the profile being available
-      if (!success) {
-        print('Attempting alternative approach due to profile not found');
-
-        // Create a minimal profile first to ensure it exists
-        final Map<String, dynamic> minimalProfileData = {
-          'shortBio': _bioController.text,
-        };
-
-        if (_studentIdController.text.isNotEmpty) {
-          minimalProfileData['identityNumber'] = _studentIdController.text;
-        }
-
-        try {
-          // Try a different approach - PUT directly to profile/me endpoint
-          // POST to /api/profile doesn't work (404)
-          final authController = Get.find<AuthController>();
-          final token = await authController.getAuthToken();
-          final apiUrl = '${ApiConstants.baseUrl}/api/profile/me';
-
-          print('REQUEST TYPE: PUT - Creating minimal profile at $apiUrl');
-          final putResponse = await http.put(
-            Uri.parse(apiUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: jsonEncode(minimalProfileData),
-          );
-
-          print('PUT create profile status: ${putResponse.statusCode}');
-          print('PUT create profile response: ${putResponse.body}');
-
-          // Refresh profile data
-          await _profileController.fetchCurrentUserProfile();
-
-          // Try update again
-          success = await _profileController.updateProfileWithNewAPI(
-            shortBio: _bioController.text,
-            identityNumber:
-                _studentIdController.text.isNotEmpty
-                    ? _studentIdController.text
-                    : null,
-            profileImageFile: _profileImage,
-            // Academic fields removed as requested
-          );
-        } catch (e) {
-          print('Error in alternative profile creation: $e');
-        }
+      // If the update failed, show helpful error message
+      if (!success &&
+          _profileController.error.value.contains('Profile not found')) {
+        print(
+          'Profile not found - user needs to complete academic details first',
+        );
       }
 
       // Log the result
@@ -243,13 +203,59 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Get.back();
         });
       } else {
-        Get.snackbar(
-          'Error',
-          'Failed to update profile: ${_profileController.error.value}',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+        // Clean error message before showing to user
+        String cleanError = ErrorMessageHelper.getUserFriendlyMessage(
+          _profileController.error.value,
         );
+
+        // Check if it's the "profile not found" error - show dialog with option to go to academic details
+        if (cleanError.contains('academic details')) {
+          Get.dialog(
+            AlertDialog(
+              title: Text(
+                'Academic Details Required',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+              ),
+              content: Text(
+                'You need to set up your academic details before updating your profile. Would you like to do that now?',
+                style: TextStyle(fontSize: 16),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Get.back(); // Close dialog
+                  },
+                  child: Text(
+                    'Later',
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Get.back(); // Close dialog
+                    Get.back(); // Close edit profile
+                    Get.toNamed('/academic-details'); // Go to academic details
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF5796FF),
+                  ),
+                  child: Text(
+                    'Set Up Now',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          Get.snackbar(
+            'Error',
+            cleanError,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.BOTTOM,
+          );
+        }
       }
     } catch (e, stackTrace) {
       // Log any exceptions
@@ -259,10 +265,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // Close loading indicator
       Get.back();
 
+      // Clean exception message before showing to user
+      String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
+
       // Show error feedback
       Get.snackbar(
         'Error',
-        'An unexpected error occurred: $e',
+        cleanError,
         backgroundColor: Colors.red,
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
@@ -409,12 +418,46 @@ class _EditProfilePageState extends State<EditProfilePage> {
       body: Obx(() {
         final profile = _profileController.studentProfile.value;
 
-        if (_profileController.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
+        // Show loading only if actually loading and no profile exists yet
+        if (_profileController.isLoading.value && profile == null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5796FF)),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Loading profile...',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          );
         }
 
         if (profile == null) {
-          return const Center(child: Text('Profile not found'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.person_off_outlined, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'Profile not found',
+                  style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                ),
+                SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    _fetchAndLoadProfileData();
+                  },
+                  child: Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
 
         return SingleChildScrollView(
@@ -425,164 +468,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
               children: [
                 // Profile Photo
                 _buildProfileAvatar(profile),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-                // Email (Read-only)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Email',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _emailController,
-                      style: const TextStyle(fontSize: 16),
-                      readOnly: true, // Make it read-only
-                      enabled: false, // Visually show as disabled
-                      decoration: InputDecoration(
-                        hintText: 'Your email address',
-                        hintStyle: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 16,
-                        ),
-                        contentPadding: const EdgeInsets.only(
-                          bottom: 8,
-                          top: 4,
-                          left: 8,
-                        ),
-                        border: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        disabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey[200]!),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                        isDense: true,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Bio
+                // Short Bio
                 _buildFormField(
-                  'Bio',
-                  'Write something about yourself',
-                  _bioController,
+                  'Short Bio',
+                  'Tell your friends about yourself',
+                  _shortBioController,
                   maxLines: 3,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-                // Phone (to be implemented when model supports it)
+                // Identity Number
                 _buildFormField(
-                  'Phone',
-                  'Your phone number',
-                  _phoneController,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 16),
-
-                // Student ID
-                _buildFormField(
-                  'Student ID',
+                  'Identity Number',
                   'Your student ID number',
-                  _studentIdController,
+                  _identityNumberController,
                 ),
                 const SizedBox(height: 24),
 
-                // Skills Section with inline Add button
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Skill as a service',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _newSkillController,
-                            style: const TextStyle(fontSize: 16),
-                            decoration: InputDecoration(
-                              hintText: 'E.g tailor, phone engineer',
-                              hintStyle: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 16,
-                              ),
-                              contentPadding: const EdgeInsets.only(
-                                bottom: 8,
-                                top: 4,
-                              ),
-                              border: UnderlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: const UnderlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Color(0xFF5796FF),
-                                  width: 2,
-                                ),
-                              ),
-                              filled: false,
-                              isDense: true,
-                            ),
-                            onChanged:
-                                (_) => setState(() => _isFormChanged = true),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _addSkill,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF5796FF),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                // Academic Email
+                _buildFormField(
+                  'Academic Email',
+                  'your.email@university.edu',
+                  _academicEmailController,
+                  keyboardType: TextInputType.emailAddress,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 24),
 
-                // Display existing skills
-                if (_skills.isNotEmpty)
-                  ..._skills.asMap().entries.map(
-                    (entry) => Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: _buildSkillItem(entry.key, entry.value),
-                    ),
-                  ),
+                // Identity Card Upload
+                _buildIdentityCardUpload(),
               ],
             ),
           ),
@@ -721,29 +636,81 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _buildSkillItem(int index, String skill) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          SvgPicture.asset('assets/icons/service.svg', width: 18, height: 18),
-          const SizedBox(width: 12),
-          Text(
-            skill,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              color: Color(0xFF606060),
+  Widget _buildIdentityCardUpload() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Upload Identity Card',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickIdentityCard,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(0),
+              border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5796FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Choose File',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _identityCardImage != null
+                            ? 'Identity card selected'
+                            : 'No file selected',
+                        style: TextStyle(color: Colors.grey[600]),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_identityCardImage != null) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _identityCardImage!,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const Spacer(),
-          IconButton(
-            onPressed: () => _removeSkill(index),
-            icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

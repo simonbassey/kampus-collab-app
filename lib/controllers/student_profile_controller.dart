@@ -237,8 +237,8 @@ class StudentProfileController extends GetxController {
         postCount: studentProfile.value!.postCount,
         academicDetails: AcadmicProfileDetails(
           institutionId:
-              studentProfile.value!.academicDetails?.institutionId ?? 
-              studentProfile.value!.institutionId ?? 
+              studentProfile.value!.academicDetails?.institutionId ??
+              studentProfile.value!.institutionId ??
               0,
           institutionName:
               studentProfile.value!.academicDetails?.institutionName ?? '',
@@ -275,7 +275,7 @@ class StudentProfileController extends GetxController {
       // Try to create a profile if it doesn't exist yet, then update it
       try {
         bool profileExists = await _checkProfileExists();
-        
+
         if (!profileExists) {
           print('Profile does not exist yet, attempting to create one...');
           // Try to create a minimal profile first
@@ -283,19 +283,21 @@ class StudentProfileController extends GetxController {
             shortBio: shortBio,
             identityNumber: identityNumber,
           );
-          
+
           if (!createSuccess) {
-            print('Failed to create minimal profile, trying legacy approach...');
+            print(
+              'Failed to create minimal profile, trying legacy approach...',
+            );
             final result = await _profileService.updateProfile(
               studentProfile.value!.userId!,
               updatedProfile,
             );
-            
+
             studentProfile.value = result;
             return true;
           }
         }
-        
+
         // Now try the update with the new API
         return await updateProfileWithNewAPI(
           shortBio: shortBio,
@@ -322,14 +324,14 @@ class StudentProfileController extends GetxController {
       isSaving.value = false;
     }
   }
-  
+
   // New method to update profile using the new API endpoint
   Future<bool> updateProfileWithNewAPI({
     String? shortBio,
     String? identityNumber,
+    String? academicEmail,
     File? profileImageFile,
     File? idCardFile,
-    // Academic fields removed as requested
   }) async {
     if (!_authController.isAuthenticated.value) {
       error.value = 'User not authenticated';
@@ -346,17 +348,31 @@ class StudentProfileController extends GetxController {
       // Only include fields that are provided, using field names from API documentation
       // /api/profile/me PUT endpoint expects these exact field names
       if (shortBio != null) profileData['shortBio'] = shortBio;
-      if (identityNumber != null) profileData['identityNumber'] = identityNumber;
-      // Academic fields removed as requested
+      if (identityNumber != null)
+        profileData['identityNumber'] = identityNumber;
+      if (academicEmail != null) profileData['academicEmail'] = academicEmail;
 
       // Handle profile image if provided
       if (profileImageFile != null) {
         try {
           print('Encoding profile image for update with new API...');
           final bytes = await profileImageFile.readAsBytes();
-          // The API expects 'profilePhotoUrl' field for the base64 encoded image
-          profileData['profilePhotoUrl'] = base64Encode(bytes);
-          print('Profile image encoded successfully for update with new API');
+          final base64Image = base64Encode(bytes);
+
+          // Validate size - API has 4000 character limit
+          if (base64Image.length > 4000) {
+            print(
+              'Warning: Profile image is too large (${base64Image.length} chars). Maximum is 4000. Skipping image upload.',
+            );
+            // Don't set error value here - we'll still try to update other fields
+            // Just log the warning
+          } else {
+            // The API expects 'profilePhotoUrl' field for the base64 encoded image
+            profileData['profilePhotoUrl'] = base64Image;
+            print(
+              'Profile image encoded successfully (${base64Image.length} chars)',
+            );
+          }
         } catch (e) {
           print('Error encoding profile image: $e');
         }
@@ -367,8 +383,21 @@ class StudentProfileController extends GetxController {
         try {
           print('Encoding ID card image for update with new API...');
           final bytes = await idCardFile.readAsBytes();
-          profileData['identityCardBase64'] = base64Encode(bytes);
-          print('ID card image encoded successfully for update with new API');
+          final base64IdCard = base64Encode(bytes);
+
+          // Validate size - API has 4000 character limit
+          if (base64IdCard.length > 4000) {
+            print(
+              'Warning: ID card image is too large (${base64IdCard.length} chars). Maximum is 4000. Skipping ID card upload.',
+            );
+            // Don't set error value here - we'll still try to update other fields
+            // Just log the warning
+          } else {
+            profileData['identityCardBase64'] = base64IdCard;
+            print(
+              'ID card image encoded successfully (${base64IdCard.length} chars)',
+            );
+          }
         } catch (e) {
           print('Error encoding ID card image: $e');
         }
@@ -376,7 +405,9 @@ class StudentProfileController extends GetxController {
 
       // Make the API call
       print('Updating profile with new API: $profileData');
-      final updatedProfile = await _profileService.updateUserProfile(profileData);
+      final updatedProfile = await _profileService.updateUserProfile(
+        profileData,
+      );
 
       // Update the local profile data
       studentProfile.value = updatedProfile;
@@ -530,31 +561,29 @@ class StudentProfileController extends GetxController {
   }) async {
     try {
       print('Attempting to create a minimal profile');
-      
+
       // Create a minimal profile with just the required fields
-      final Map<String, dynamic> profileData = {
-        'shortBio': shortBio ?? '',
-      };
-      
+      final Map<String, dynamic> profileData = {'shortBio': shortBio ?? ''};
+
       if (identityNumber != null && identityNumber.isNotEmpty) {
         profileData['identityNumber'] = identityNumber;
       }
-      
+
       // Try creating the profile using POST
       final apiUrl = '${ApiConstants.baseUrl}/api/profile/me';
       final token = await _authController.getAuthToken();
-      
+
       if (token == null) {
         throw Exception('Authentication token not found');
       }
-      
+
       final headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
-      
+
       print('Creating profile with data: $profileData');
-      
+
       final client = http.Client();
       try {
         // Skip trying POST first since it doesn't work (404)
@@ -565,10 +594,10 @@ class StudentProfileController extends GetxController {
           headers: headers,
           body: jsonEncode(profileData),
         );
-        
+
         print('PUT Profile Response: ${putResponse.statusCode}');
         print('PUT Profile Body: ${putResponse.body}');
-        
+
         return putResponse.statusCode == 200;
       } finally {
         client.close();

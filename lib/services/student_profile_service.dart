@@ -14,7 +14,9 @@ class StudentProfileService {
   }
 
   // Update profile using the new /api/profile/me endpoint
-  Future<StudentProfileModel> updateUserProfile(Map<String, dynamic> profileData) async {
+  Future<StudentProfileModel> updateUserProfile(
+    Map<String, dynamic> profileData,
+  ) async {
     print('Updating profile with data: $profileData');
 
     try {
@@ -27,32 +29,43 @@ class StudentProfileService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
-      
+
       // First, check if the profile exists by making a GET request
       final getApiUrl = '${ApiConstants.baseUrl}/api/profile/me';
       print('Checking if profile exists: $getApiUrl');
-      
+
       print('REQUEST TYPE: GET - Checking if profile exists');
       final getResponse = await http.get(
         Uri.parse(getApiUrl),
         headers: headers,
       );
-      
+
       print('GET Profile Response Status Code: ${getResponse.statusCode}');
       print('GET Profile Response Body: ${getResponse.body}');
-      
+
       if (getResponse.statusCode != 200) {
-        print('Warning: Profile may not exist yet - GET returned ${getResponse.statusCode}');
+        print(
+          'Warning: Profile may not exist yet - GET returned ${getResponse.statusCode}',
+        );
       } else {
-        final profileJson = jsonDecode(getResponse.body);
-        print('Current profile data: ${profileJson['data']}');
+        try {
+          if (getResponse.body.isEmpty) {
+            print('Warning: GET response body is empty');
+          } else {
+            final profileJson = jsonDecode(getResponse.body);
+            print('Current profile data: ${profileJson['data']}');
+          }
+        } catch (e) {
+          print('Error parsing GET response: $e');
+          print('GET Response body: ${getResponse.body}');
+        }
       }
-      
+
       // Only use the known working endpoint
       print('Using the correct profile endpoint: /api/profile/me');
-      
+
       // No need to test multiple endpoints anymore
-      
+
       // Now proceed with the update
       final putApiUrl = '${ApiConstants.baseUrl}/api/profile/me';
       print('Using update API URL: $putApiUrl');
@@ -71,12 +84,21 @@ class StudentProfileService {
 
       if (response.statusCode == 200) {
         if (response.body.isNotEmpty) {
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse['success'] == true && jsonResponse['data'] != null) {
-            return StudentProfileModel.fromJson(jsonResponse['data']);
-          } else {
-            // Handle success:false case
-            throw Exception('API returned success:false - ${jsonResponse['message']}');
+          try {
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['success'] == true &&
+                jsonResponse['data'] != null) {
+              return StudentProfileModel.fromJson(jsonResponse['data']);
+            } else {
+              // Handle success:false case
+              throw Exception(
+                'API returned success:false - ${jsonResponse['message']}',
+              );
+            }
+          } catch (e) {
+            print('Error parsing PUT response: $e');
+            print('PUT Response body: ${response.body}');
+            throw Exception('Failed to parse response: $e');
           }
         } else {
           throw Exception('Empty response received from server');
@@ -130,24 +152,30 @@ class StudentProfileService {
       print('Request headers: $headers');
 
       print('REQUEST TYPE: GET - Fetching profile');
-      final response = await http.get(
-        Uri.parse(workingUrl),
-        headers: headers,
-      );
+      final response = await http.get(Uri.parse(workingUrl), headers: headers);
 
       print('API Response Status Code: ${response.statusCode}');
       print('API Response Body Length: ${response.body.length}');
 
       if (response.statusCode == 200) {
         if (response.body.isNotEmpty) {
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse['success'] == true && jsonResponse['data'] != null) {
-            final profileJson = jsonResponse['data'];
-            print('Successfully fetched profile for: ${profileJson['email'] ?? 'unknown'}');
-            // Return as a list containing just the current user's profile
-            return [StudentProfileModel.fromJson(profileJson)];
-          } else {
-            print('API response format unexpected: ${response.body}');
+          try {
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['success'] == true &&
+                jsonResponse['data'] != null) {
+              final profileJson = jsonResponse['data'];
+              print(
+                'Successfully fetched profile for: ${profileJson['email'] ?? 'unknown'}',
+              );
+              // Return as a list containing just the current user's profile
+              return [StudentProfileModel.fromJson(profileJson)];
+            } else {
+              print('API response format unexpected: ${response.body}');
+              return [];
+            }
+          } catch (e) {
+            print('Error parsing profile response: $e');
+            print('Profile Response body: ${response.body}');
             return [];
           }
         } else {
@@ -155,7 +183,9 @@ class StudentProfileService {
           return [];
         }
       } else {
-        print('Failed to load profile with status code: ${response.statusCode}');
+        print(
+          'Failed to load profile with status code: ${response.statusCode}',
+        );
         throw Exception('Failed to load profile: ${response.body}');
       }
     } catch (e) {
@@ -251,7 +281,9 @@ class StudentProfileService {
     // Get the auth token
     final token = await getAuthToken();
 
-    print('REQUEST TYPE: PUT - Updating profile using legacy endpoint (not recommended)');
+    print(
+      'REQUEST TYPE: PUT - Updating profile using legacy endpoint (not recommended)',
+    );
     final response = await http.put(
       Uri.parse('${ApiConstants.baseUrl}/api/StudentProfiles/update/$id'),
       headers: {
@@ -311,32 +343,69 @@ class StudentProfileService {
         'facultyOrDisciplineId': facultyOrDisciplineId,
         'yearOfStudy': yearOfStudy,
       };
-      
-      print('REQUEST TYPE: PUT - Updating academic profile');
-      final response = await http.put(
-        Uri.parse(ApiConstants.updateAcademicProfile),
+
+      print('REQUEST TYPE: POST - Creating academic profile');
+      print(
+        'Academic profile create URL: ${ApiConstants.createAcademicProfile}',
+      );
+      print('Academic profile create body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse(ApiConstants.createAcademicProfile),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(requestBody),
       );
-      
-      print('Academic profile update response status: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        if (response.body.isNotEmpty) {
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse['success'] == true && jsonResponse['data'] != null) {
-            return StudentProfileModel.fromJson(jsonResponse['data']);
+
+      print('Academic profile create response status: ${response.statusCode}');
+      print('Academic profile create response body: ${response.body}');
+
+      // API returns 204 No Content on success
+      if (response.statusCode == 204 ||
+          response.statusCode == 200 ||
+          response.statusCode == 201) {
+        print('Academic profile created successfully');
+        // Fetch the updated profile to return
+        final updatedProfile = await getCurrentUserProfile();
+        return updatedProfile;
+      } else if (response.statusCode == 400) {
+        // Bad Request - validation error
+        try {
+          if (response.body.isNotEmpty) {
+            final errorData = jsonDecode(response.body);
+            String errorMessage = errorData['title'] ?? 'Validation error';
+            if (errorData['detail'] != null) {
+              errorMessage += ': ${errorData['detail']}';
+            }
+            throw Exception(errorMessage);
           } else {
-            throw Exception('API returned success:false - ${jsonResponse['message']}');
+            throw Exception('Bad request - Invalid data provided');
           }
-        } else {
-          throw Exception('Empty response received from server');
+        } catch (e) {
+          print('Error parsing 400 error response: $e');
+          throw Exception('Bad request: ${response.body}');
         }
       } else {
-        throw Exception('Failed to update academic profile: ${response.body}');
+        // Other errors
+        String errorMessage;
+        switch (response.statusCode) {
+          case 404:
+            errorMessage =
+                'Endpoint not found - Please check API configuration';
+            break;
+          case 401:
+            errorMessage = 'Authentication error - Please log in again';
+            break;
+          case 500:
+            errorMessage = 'Server error - Please try again later';
+            break;
+          default:
+            errorMessage =
+                'Failed to create academic profile (${response.statusCode})';
+        }
+        throw Exception('$errorMessage: ${response.body}');
       }
     } catch (e) {
       print('Exception updating academic profile: $e');

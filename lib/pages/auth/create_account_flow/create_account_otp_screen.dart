@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import '../../../controllers/auth_controller.dart';
+import '../../../utils/error_message_helper.dart';
 
 class CreateAccountOtpScreen extends StatefulWidget {
   const CreateAccountOtpScreen({super.key});
@@ -14,36 +15,46 @@ class CreateAccountOtpScreen extends StatefulWidget {
 
 class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
   final AuthController _authController = Get.find<AuthController>();
-  final List<TextEditingController> _otpControllers = List.generate(5, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    5,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(5, (_) => FocusNode());
-  
+
   String? _email;
   int _resendSeconds = 30;
   Timer? _timer;
   bool _isOtpValid = true;
   bool _isOtpCorrect = false;
-  
+
   @override
   void initState() {
     super.initState();
     _startResendTimer();
-    
+
     // Get email from arguments if available
     if (Get.arguments != null && Get.arguments['email'] != null) {
       _email = Get.arguments['email'];
-      
+
       // Store the email in the controller for further API calls
       _authController.currentEmail.value = _email!;
-      
+
       // Automatically trigger OTP resend for unverified accounts coming from login
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // Trigger OTP resend and show notification
         _authController.resendOtp().then((success) {
+          String message =
+              success
+                  ? 'A verification code has been sent to your email'
+                  : ErrorMessageHelper.cleanErrorMessage(
+                    _authController.errorMessage.value.isNotEmpty
+                        ? _authController.errorMessage.value
+                        : 'Failed to send verification code. Try using the resend button.',
+                  );
+
           Get.snackbar(
             success ? 'Code Sent' : 'Error',
-            success 
-              ? 'A verification code has been sent to your email'
-              : 'Failed to send verification code. Try using the resend button.',
+            message,
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: success ? Colors.blue[100] : Colors.red[100],
             colorText: success ? Colors.blue[900] : Colors.red[900],
@@ -52,7 +63,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
         });
       });
     }
-    
+
     // Set up focus node listeners for auto-advance
     for (int i = 0; i < 4; i++) {
       _focusNodes[i].addListener(() {
@@ -62,7 +73,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
       });
     }
   }
-  
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -74,7 +85,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
     }
     super.dispose();
   }
-  
+
   void _startResendTimer() {
     _timer?.cancel();
     _resendSeconds = 30;
@@ -88,7 +99,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
       }
     });
   }
-  
+
   void _resendCode() async {
     if (_resendSeconds == 0) {
       final result = await _authController.resendOtp();
@@ -102,9 +113,13 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
           margin: const EdgeInsets.all(16),
         );
       } else {
+        String cleanError = ErrorMessageHelper.getUserFriendlyMessage(
+          _authController.errorMessage.value,
+        );
+
         Get.snackbar(
           'Error',
-          _authController.errorMessage.value,
+          cleanError,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
@@ -114,21 +129,21 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
       _startResendTimer();
     }
   }
-  
+
   void _verifyOtp() async {
     // Collect OTP digits
     final otp = _otpControllers.map((controller) => controller.text).join();
-    
+
     if (otp.length == 5) {
       // Call the auth controller to complete signup with OTP
       final success = await _authController.completeSignup(otp);
-      
+
       if (success) {
         setState(() {
           _isOtpValid = true;
           _isOtpCorrect = true;
         });
-        
+
         // Verify token is available from auth controller
         final authToken = await _authController.getAuthToken();
         if (authToken == null || authToken.isEmpty) {
@@ -143,7 +158,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
           );
           return;
         }
-        
+
         // Show success message
         Get.snackbar(
           'Success',
@@ -153,7 +168,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
           colorText: Colors.green[900],
           margin: const EdgeInsets.all(16),
         );
-        
+
         // Wait a moment to show the green borders before navigating
         Future.delayed(const Duration(milliseconds: 1000), () {
           // Navigate to success screen or home screen with token
@@ -164,17 +179,21 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
           _isOtpValid = false;
           _isOtpCorrect = false;
         });
-        
+
         // Show error message
+        String cleanError = ErrorMessageHelper.getUserFriendlyMessage(
+          _authController.errorMessage.value,
+        );
+
         Get.snackbar(
           'Error',
-          _authController.errorMessage.value,
+          cleanError,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
           margin: const EdgeInsets.all(16),
         );
-        
+
         // Clear the fields after a short delay
         Future.delayed(const Duration(seconds: 1), () {
           setState(() {
@@ -191,12 +210,11 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
       }
     }
   }
-  
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -207,7 +225,7 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 40),
-                
+
                 // Header with back button and logo
                 Row(
                   children: [
@@ -229,9 +247,9 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                     const SizedBox(width: 48),
                   ],
                 ),
-                
+
                 const SizedBox(height: 40),
-                
+
                 // Title
                 Text(
                   'Enter the code',
@@ -242,9 +260,9 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 16.0),
-                
+
                 // Email info
                 Text(
                   'A code was sent to ${_email ?? "your email"}',
@@ -265,9 +283,9 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 48.0),
-                
+
                 // OTP Input Fields
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -280,10 +298,11 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8.0),
                         border: Border.all(
-                          color: !_isOtpValid 
-                              ? const Color.fromARGB(255, 245, 117, 117) 
-                              : _isOtpCorrect 
-                                  ? const Color(0xFF57C696) 
+                          color:
+                              !_isOtpValid
+                                  ? const Color.fromARGB(255, 245, 117, 117)
+                                  : _isOtpCorrect
+                                  ? const Color(0xFF57C696)
                                   : const Color(0xFFE8E8E8),
                           width: !_isOtpValid || _isOtpCorrect ? 2.0 : 1.0,
                         ),
@@ -324,84 +343,98 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
                     );
                   }),
                 ),
-                
+
                 const SizedBox(height: 32.0),
-                
+
                 // Resend code timer/button
-                Obx(() => GestureDetector(
-                  onTap: (_resendSeconds > 0 || _authController.isResendingOtp.value) ? null : _resendCode,
-                  child: _authController.isResendingOtp.value
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: const Color(0xFF5796FF),
+                Obx(
+                  () => GestureDetector(
+                    onTap:
+                        (_resendSeconds > 0 ||
+                                _authController.isResendingOtp.value)
+                            ? null
+                            : _resendCode,
+                    child:
+                        _authController.isResendingOtp.value
+                            ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: const Color(0xFF5796FF),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Resending...',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF5796FF),
+                                    fontFamily: GoogleFonts.inter().fontFamily,
+                                  ),
+                                ),
+                              ],
+                            )
+                            : Text(
+                              _resendSeconds > 0
+                                  ? 'Resend code in $_resendSeconds'
+                                  : 'Resend code',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color:
+                                    _resendSeconds > 0
+                                        ? Colors.grey
+                                        : const Color(0xFF5796FF),
+                                fontFamily: GoogleFonts.inter().fontFamily,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Resending...',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF5796FF),
-                              fontFamily: GoogleFonts.inter().fontFamily,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(
-                        _resendSeconds > 0
-                            ? 'Resend code in $_resendSeconds'
-                            : 'Resend code',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: _resendSeconds > 0
-                              ? Colors.grey
-                              : const Color(0xFF5796FF),
-                          fontFamily: GoogleFonts.inter().fontFamily,
-                        ),
-                      ),
-                )),
-                
-                const SizedBox(height: 40.0),
-                
-                // Verify Button
-                Obx(() => ElevatedButton(
-                  onPressed: _authController.isCompletingSignup.value ? null : _verifyOtp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5796FF),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    minimumSize: const Size(double.infinity, 50),
                   ),
-                  child: _authController.isCompletingSignup.value
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        'Verify',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: GoogleFonts.inter().fontFamily,
-                        ),
+                ),
+
+                const SizedBox(height: 40.0),
+
+                // Verify Button
+                Obx(
+                  () => ElevatedButton(
+                    onPressed:
+                        _authController.isCompletingSignup.value
+                            ? null
+                            : _verifyOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5796FF),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
                       ),
-                )),
-                
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    child:
+                        _authController.isCompletingSignup.value
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : Text(
+                              'Verify',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                fontFamily: GoogleFonts.inter().fontFamily,
+                              ),
+                            ),
+                  ),
+                ),
+
                 const SizedBox(height: 20.0),
               ],
             ),

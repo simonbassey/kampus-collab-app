@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../../controllers/student_profile_controller.dart';
 import '../../controllers/auth_controller.dart';
+import '../../controllers/post_controller.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'edit_profile_page.dart';
 import '../../widgets/profile_photo_viewer.dart';
+import '../feed/post_components/post_base.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,15 +23,36 @@ class _ProfilePageState extends State<ProfilePage>
   final StudentProfileController _profileController =
       Get.find<StudentProfileController>();
   final AuthController _authController = Get.find<AuthController>();
+  final PostController _postController = Get.put(PostController());
   late TabController _tabController;
+
+  // State for "See More" functionality
+  int _displayedPostsCount = 1; // Show 1 post initially
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    // Fetch profile data when page loads
-    _profileController.fetchCurrentUserProfile();
+    // Check if profile is already loaded and has valid data
+    final currentProfile = _profileController.studentProfile.value;
+
+    if (currentProfile == null) {
+      print('ProfilePage: No cached data, fetching profile...');
+      _profileController.fetchCurrentUserProfile();
+    } else if (currentProfile.fullName == null ||
+        currentProfile.fullName!.isEmpty) {
+      print('ProfilePage: Username is null/empty, refetching profile...');
+      _profileController.fetchCurrentUserProfile();
+    } else {
+      print(
+        'ProfilePage: Using preloaded profile data with username: ${currentProfile.fullName}',
+      );
+      // Fetch user posts when profile is loaded
+      if (currentProfile.userId != null) {
+        _postController.loadUserPosts(currentProfile.userId!);
+      }
+    }
   }
 
   @override
@@ -266,8 +289,24 @@ class _ProfilePageState extends State<ProfilePage>
         ],
       ),
       body: Obx(() {
-        // Show error if any
-        if (_profileController.error.value.isNotEmpty) {
+        final profile = _profileController.studentProfile.value;
+
+        // Show loading only if loading AND no profile data exists
+        if (_profileController.isLoading.value && profile == null) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: Color(0xFF5796FF)),
+                SizedBox(height: 16),
+                Text('Loading profile...'),
+              ],
+            ),
+          );
+        }
+
+        // Show error only if there's an error AND no profile data
+        if (_profileController.error.value.isNotEmpty && profile == null) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -290,20 +329,6 @@ class _ProfilePageState extends State<ProfilePage>
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
-              ],
-            ),
-          );
-        }
-
-        // Show loading indicator
-        if (_profileController.isLoading.value) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Color(0xFF5796FF)),
-                SizedBox(height: 16),
-                Text('Loading profile...'),
               ],
             ),
           );
@@ -416,7 +441,7 @@ class _ProfilePageState extends State<ProfilePage>
               ),
               SizedBox(width: 4),
               Text(
-                '@${profile?.email?.split('@').first ?? 'Anonymous'}',
+                '@${profile?.email.split('@').first ?? 'Anonymous'}',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 16,
@@ -478,9 +503,15 @@ class _ProfilePageState extends State<ProfilePage>
   Widget _buildFollowSection() {
     return Obx(() {
       final profile = _profileController.studentProfile.value;
-      final followingCount = profile?.followingCount != null ? profile!.followingCount.toString() : '0';
-      final followerCount = profile?.followerCount != null ? profile!.followerCount.toString() : '0';
-      
+      final followingCount =
+          profile?.followingCount != null
+              ? profile!.followingCount.toString()
+              : '0';
+      final followerCount =
+          profile?.followerCount != null
+              ? profile!.followerCount.toString()
+              : '0';
+
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -543,36 +574,137 @@ class _ProfilePageState extends State<ProfilePage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 60, // Space for tab content
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildBlogPostsTab(),
-              _buildSavedTab(),
-              _buildProjectsTab(),
-            ],
-          ),
+        // Tab content based on selected index
+        AnimatedBuilder(
+          animation: _tabController,
+          builder: (context, child) {
+            switch (_tabController.index) {
+              case 0:
+                return _buildBlogPostsTab();
+              case 1:
+                return _buildSavedTab();
+              case 2:
+                return _buildProjectsTab();
+              default:
+                return _buildBlogPostsTab();
+            }
+          },
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 20),
         _buildEducationSection(),
         const SizedBox(height: 30),
         _buildSkillsSection(),
+        SizedBox(height: 30),
       ],
     );
   }
 
   Widget _buildBlogPostsTab() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Text(
-          '0 post',
-          style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-        ),
-      ),
-    );
+    return Obx(() {
+      final isLoading = _postController.isLoadingUserPosts.value;
+      final userPosts = _postController.userPosts;
+
+      if (isLoading) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: CircularProgressIndicator(color: Color(0xFF5796FF)),
+          ),
+        );
+      }
+
+      if (userPosts.isEmpty) {
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              '0 posts',
+              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+            ),
+          ),
+        );
+      }
+
+      // Calculate how many posts to display
+      final postsToShow = userPosts.take(_displayedPostsCount).toList();
+      final hasMore = userPosts.length > _displayedPostsCount;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 10),
+            child: Text(
+              '${userPosts.length} ${userPosts.length == 1 ? 'post' : 'posts'}',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          // Display posts
+          ...postsToShow.map(
+            (post) => Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: PostBase(post: post),
+            ),
+          ),
+          // "See More" button
+          if (hasMore)
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _displayedPostsCount += 5; // Load 5 more posts
+                  });
+                },
+                icon: Icon(Icons.expand_more, color: Color(0xFF5796FF)),
+                label: Text(
+                  'See More',
+                  style: TextStyle(
+                    color: Color(0xFF5796FF),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          // Show "Show Less" button if more than 1 post is displayed
+          if (_displayedPostsCount > 1 && !hasMore)
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _displayedPostsCount = 1; // Reset to show only 1 post
+                  });
+                },
+                icon: Icon(Icons.expand_less, color: Colors.grey[700]),
+                label: Text(
+                  'Show Less',
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ),
+          SizedBox(height: 10),
+        ],
+      );
+    });
   }
 
   Widget _buildSavedTab() {
@@ -723,84 +855,80 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildSkillsSection() {
-    return Obx(() {
-      final profile = _profileController.studentProfile.value;
+    // In the future, we'll get skills from the API
+    // For now, using placeholder data
+    List<String> skills = [];
 
-      // In the future, we'll get skills from the API
-      // For now, using placeholder data
-      List<String> skills = []; 
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Skill as a service',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                  fontStyle: FontStyle.normal,
-                  letterSpacing: -0.41,
-                  color: Color(0xFF333333),
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Skill as a service',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                fontStyle: FontStyle.normal,
+                letterSpacing: -0.41,
+                color: Color(0xFF333333),
               ),
-              GestureDetector(
-                onTap: () {
-                  Get.to(() => const EditProfilePage());
-                },
-                child: SvgPicture.asset(
-                  'assets/icons/edit.svg',
-                  width: 18,
-                  height: 18,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (skills.isNotEmpty)
-            ...skills.map(
-              (skill) => _buildSkillItem(
-                skill: skill,
-                skillSvg: 'assets/icons/service.svg',
-              ),
-            )
-          else
+            ),
             GestureDetector(
               onTap: () {
                 Get.to(() => const EditProfilePage());
               },
-              child: Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 10),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline,
-                      size: 18,
-                      color: Color(0xFF5796FF),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Add your skills',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w400,
-                        fontStyle: FontStyle.normal,
-                        fontSize: 14,
-                        height: 22 / 14,
-                        letterSpacing: -0.41,
-                        color: Color(0xFF5796FF),
-                      ),
-                    ),
-                  ],
-                ),
+              child: SvgPicture.asset(
+                'assets/icons/edit.svg',
+                width: 18,
+                height: 18,
               ),
             ),
-        ],
-      );
-    });
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (skills.isNotEmpty)
+          ...skills.map(
+            (skill) => _buildSkillItem(
+              skill: skill,
+              skillSvg: 'assets/icons/service.svg',
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: () {
+              Get.to(() => const EditProfilePage());
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10, bottom: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.add_circle_outline,
+                    size: 18,
+                    color: Color(0xFF5796FF),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Add your skills',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w400,
+                      fontStyle: FontStyle.normal,
+                      fontSize: 14,
+                      height: 22 / 14,
+                      letterSpacing: -0.41,
+                      color: Color(0xFF5796FF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildSkillItem({

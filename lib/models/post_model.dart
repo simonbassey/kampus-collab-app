@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 enum PostType { text, image, link }
 
 // Content type from API
@@ -47,7 +45,7 @@ class PostModel {
     required this.type,
     this.link,
   });
-  
+
   // Convert API JSON response to PostModel - using simplified structure
   // We'll have to fill in missing fields with mock data for UI display
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -64,45 +62,64 @@ class PostModel {
           return PostType.text;
       }
     }
-    
+
     // Handle the case where media URLs could be a string or a list
     List<String> parseMediaUrls(dynamic mediaUrls) {
       if (mediaUrls == null) return [];
-      
+
       if (mediaUrls is String) {
         return [mediaUrls];
       } else if (mediaUrls is List) {
         return mediaUrls.map((url) => url.toString()).toList();
       }
-      
+
       return [];
     }
-    
+
     // Generate a random ID if not present
-    String id = json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
-    
+    String id =
+        json['id']?.toString() ??
+        DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Map API field names to our model field names
+    String userId =
+        json['creatorId']?.toString() ?? json['userId']?.toString() ?? 'user1';
+    String userName = json['creatorName'] ?? json['userName'] ?? 'Campus User';
+    String? userAvatar = json['creatorAvatar'] ?? json['userAvatar'];
+
+    // Generate user handle from name or email if not provided
+    String userHandle =
+        json['userHandle'] ?? '@${userName.toLowerCase().replaceAll(' ', '')}';
+
+    // Extract reaction/engagement counts
+    int likes = json['reactionCount'] ?? json['likesCount'] ?? 0;
+    int comments = json['commentCount'] ?? json['commentsCount'] ?? 0;
+    int shares = json['repostCount'] ?? json['sharesCount'] ?? 0;
+
     return PostModel(
-      // Use available fields from API, fill rest with mock data
+      // Use available fields from API
       id: id,
-      userId: json['userId']?.toString() ?? 'user1',
-      userName: json['userName'] ?? 'Campus User',
-      userAvatar: json['userAvatar'] ?? 'https://randomuser.me/api/portraits/people/${id.hashCode % 100}.jpg',
-      userHandle: json['userHandle'] ?? '@user$id',
+      userId: userId,
+      userName: userName,
+      // Use empty string as fallback instead of generating URL - UI will show icon
+      userAvatar: userAvatar ?? '',
+      userHandle: userHandle,
       userRole: json['userRole'] ?? 'Student',
       universityLogo: json['universityLogo'],
       content: json['content'] ?? '',
       images: parseMediaUrls(json['mediaUrls']),
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt']) 
-          : DateTime.now(),
-      likes: json['likesCount'] ?? 0,
-      comments: json['commentsCount'] ?? 0,
-      shares: json['sharesCount'] ?? 0,
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'])
+              : DateTime.now(),
+      likes: likes,
+      comments: comments,
+      shares: shares,
       type: getPostType(json['contentType']),
       link: json['link'],
     );
   }
-  
+
   // Convert to JSON for API requests - simplified structure as per requirements
   Map<String, dynamic> toJson() {
     String getContentType() {
@@ -115,7 +132,7 @@ class PostModel {
           return 'Text';
       }
     }
-    
+
     return {
       'content': content,
       'contentType': getContentType(),

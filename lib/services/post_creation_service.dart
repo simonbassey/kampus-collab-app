@@ -3,26 +3,29 @@ import 'package:http/http.dart' as http;
 import 'package:get/get.dart';
 import '../constants/api.dart';
 import '../controllers/auth_controller.dart';
-import '../controllers/student_profile_controller.dart';
 
 class PostCreationService {
   final AuthController _authController = Get.find<AuthController>();
-  final StudentProfileController _profileController = Get.find<StudentProfileController>();
 
-  Future<Map<String, dynamic>> createPost(String content, String visibility, {List<String>? imagePaths}) async {
+  Future<Map<String, dynamic>> createPost(
+    String content,
+    String visibility, {
+    List<String>? imagePaths,
+  }) async {
     // Check authentication
     if (!_authController.isAuthenticated.value) {
       throw Exception('User not authenticated. Please log in.');
     }
-    
+
     final token = await _authController.getAuthToken();
     if (token == null) {
       throw Exception('User is not authenticated');
     }
-    
-    // Make sure profile is loaded
-    if (_profileController.studentProfile.value == null) {
-      await _profileController.fetchCurrentUserProfile();
+
+    // Determine content type based on whether images are provided
+    String contentType = 'Text';
+    if (imagePaths != null && imagePaths.isNotEmpty) {
+      contentType = 'Image';
     }
 
     final response = await http.post(
@@ -33,14 +36,11 @@ class PostCreationService {
       },
       body: jsonEncode({
         'content': content,
-        // Convert visibility options to backend-compatible values
-        'visibility': _convertVisibilityToApiValue(visibility),
-        // Add user profile metadata if available
-        'authorId': _profileController.studentProfile.value?.userId,
-        'authorName': _profileController.studentProfile.value?.fullName,
-        'authorProfileImage': _profileController.studentProfile.value?.profilePhotoUrl,
-        // Include image paths if available
-        'images': imagePaths ?? [],
+        'contentType': contentType,
+        'mediaUrls': imagePaths ?? [],
+        'audience': _convertVisibilityToApiValue(visibility),
+        // Don't include parentId for original posts (backend validation issue)
+        'postType': 'Original',
       }),
     );
 
@@ -55,20 +55,20 @@ class PostCreationService {
       throw Exception('Failed to create post: ${response.body}');
     }
   }
-  
-  // Convert UI visibility options to API-compatible values
+
+  // Convert UI visibility options to API-compatible audience values
   String _convertVisibilityToApiValue(String visibility) {
     switch (visibility) {
       case 'Everyone':
-        return 'public';
+        return 'Public';
       case 'Verified accounts only':
-        return 'verified';
+        return 'Public'; // API only supports Public, Private, Friends
       case 'Accounts you follow':
-        return 'followers';
+        return 'Friends';
       case 'Accounts you mention':
-        return 'mentioned';
+        return 'Private';
       default:
-        return 'public';
+        return 'Public';
     }
   }
 }

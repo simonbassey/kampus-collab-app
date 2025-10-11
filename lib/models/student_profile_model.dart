@@ -64,8 +64,12 @@ class StudentProfileModel {
       facultyId: json['facultyId'],
       yearOfStudy: json['yearOfStudy'],
       completionPercentage: json['completionPercentage'],
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
-      lastUpdatedAt: json['lastUpdatedAt'] != null ? DateTime.parse(json['lastUpdatedAt']) : null,
+      createdAt:
+          json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      lastUpdatedAt:
+          json['lastUpdatedAt'] != null
+              ? DateTime.parse(json['lastUpdatedAt'])
+              : null,
     );
   }
 
@@ -73,30 +77,35 @@ class StudentProfileModel {
   Map<String, dynamic> toUpdateJson() {
     return {
       'fullName': fullName,
-      'identityCardBase64': academicDetails?.identityCardBase64 ?? identityCardBase64,
+      'identityCardBase64':
+          academicDetails?.identityCardBase64 ?? identityCardBase64,
       'identityNumber': academicDetails?.identityNumber ?? identityNumber,
       'email': email,
       'profilePicture': profilePhotoUrl,
       'shortBio': shortBio,
-      'departmentOrProgramId': academicDetails?.departmentOrProgramId ?? departmentOrProgramId,
-      'facultyOrDisciplineId': academicDetails?.facultyOrDisciplineId ?? facultyId,
+      'departmentOrProgramId':
+          academicDetails?.departmentOrProgramId ?? departmentOrProgramId,
+      'facultyOrDisciplineId':
+          academicDetails?.facultyOrDisciplineId ?? facultyId,
       'yearOfStudy': academicDetails?.yearOfStudy ?? yearOfStudy,
     };
   }
-  
+
   // For update requests using the new profile/me API
   Map<String, dynamic> toProfileUpdateJson() {
     final Map<String, dynamic> data = {};
-    
+
     // Only include non-null fields in the update
-    if (identityCardBase64 != null) data['identityCardBase64'] = identityCardBase64;
+    if (identityCardBase64 != null)
+      data['identityCardBase64'] = identityCardBase64;
     if (identityNumber != null) data['identityNumber'] = identityNumber;
     if (profilePhotoUrl != null) data['profilePhotoUrl'] = profilePhotoUrl;
     if (shortBio != null) data['shortBio'] = shortBio;
-    if (departmentOrProgramId != null) data['departmentOrProgramId'] = departmentOrProgramId;
+    if (departmentOrProgramId != null)
+      data['departmentOrProgramId'] = departmentOrProgramId;
     if (facultyId != null) data['facultyId'] = facultyId;
     if (yearOfStudy != null) data['yearOfStudy'] = yearOfStudy;
-    
+
     return data;
   }
 }
@@ -126,13 +135,18 @@ class AcadmicProfileDetails {
 
   factory AcadmicProfileDetails.fromJson(Map<String, dynamic> json) {
     return AcadmicProfileDetails(
-      institutionId: json['institutionId'],
-      institutionName: json['institutionName'],
-      facultyOrDisciplineId: json['facultyOrDisciplineId'],
-      facultyOrDisciplineName: json['facultyOrDisciplineName'],
-      departmentOrProgramId: json['departmentOrProgramId'],
-      departmentOrProgramName: json['departmentOrProgramName'],
-      yearOfStudy: json['yearOfStudy'],
+      institutionId: json['institutionId'] as int,
+      institutionName: json['institutionName'] as String,
+      // API returns 'facultyId' and 'facultyName', map them to our field names
+      facultyOrDisciplineId:
+          (json['facultyOrDisciplineId'] ?? json['facultyId']) as int,
+      facultyOrDisciplineName:
+          (json['facultyOrDisciplineName'] ?? json['facultyName']) as String,
+      departmentOrProgramId: json['departmentOrProgramId'] as int,
+      departmentOrProgramName: json['departmentOrProgramName'] as String,
+      yearOfStudy: json['yearOfStudy'] as int,
+      identityCardBase64: json['identityCardBase64'] as String?,
+      identityNumber: json['identityNumber'] as String?,
     );
   }
 }

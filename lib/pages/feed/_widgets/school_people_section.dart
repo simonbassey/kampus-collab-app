@@ -23,17 +23,17 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
 
   // To store the mounted status when initiating async operations
   bool _mounted = true;
-  
+
   @override
   void dispose() {
     // Mark as unmounted
     _mounted = false;
     super.dispose();
   }
-  
+
   void _loadPeople() {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -94,11 +94,9 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
                   'assets/icons/combo shape.svg',
                   width: 20,
                   height: 20,
-                  errorBuilder: (context) => Icon(
-                    Icons.people,
-                    size: 20,
-                    color: Colors.black87,
-                  ),
+                  errorBuilder:
+                      (context) =>
+                          Icon(Icons.people, size: 20, color: Colors.black87),
                 ),
                 const SizedBox(width: 8),
                 Text(
