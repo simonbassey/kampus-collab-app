@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -38,6 +40,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   RxBool isLoading = false.obs;
   RxBool isFetchingProfile = false.obs;
   RxBool isSuccess = false.obs;
+
+  // Form change tracking
+  bool _isFormChanged = false;
 
   @override
   void initState() {
@@ -128,33 +133,98 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: Row(
-          children: [
-            SizedBox(width: 16),
-            Container(
-              height: 32,
-              width: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF5FF),
-                borderRadius: BorderRadius.circular(1000),
-              ),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 16,
-                  color: Color(0xff5796FF),
-                ),
-                onPressed: () => Get.back(),
-              ),
+        automaticallyImplyLeading: false,
+        leading: GestureDetector(
+          onTap: () {
+            if (_isFormChanged) {
+              showDialog(
+                context: context,
+                builder:
+                    (context) => AlertDialog(
+                      backgroundColor: Colors.white,
+                      title: const Text(
+                        'Discard Changes?',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 18,
+                          letterSpacing: -0.41,
+                          color: Color(0xff333333),
+                        ),
+                      ),
+                      content: const Text(
+                        'You have unsaved changes. Are you sure you want to discard them?',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w400,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 16,
+                          letterSpacing: -0.41,
+                          color: Color(0xff333333),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              fontStyle: FontStyle.normal,
+                              fontSize: 16,
+                              letterSpacing: -0.41,
+                              color: Color(0xff333333),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Get.back();
+                          },
+                          child: const Text(
+                            'Discard',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              fontStyle: FontStyle.normal,
+                              fontSize: 16,
+                              letterSpacing: -0.41,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+              );
+            } else {
+              Get.back();
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.only(left: 16, bottom: 16),
+            height: 20,
+            width: 20,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF5FF),
+              borderRadius: BorderRadius.circular(1000),
             ),
-          ],
+            child: const Icon(
+              Icons.arrow_back_ios_new,
+              size: 16,
+              color: Color(0xff5796FF),
+            ),
+          ),
         ),
         actions: [
           Obx(
             () =>
-                isLoading.value
+                _profileController.isSaving.value || isLoading.value
                     ? Container(
                       padding: const EdgeInsets.only(right: 16),
+                      margin: const EdgeInsets.only(bottom: 16),
                       child: const Center(
                         child: SizedBox(
                           height: 20,
@@ -227,6 +297,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Widget _buildProfileAvatar() {
+    final profile = _profileController.studentProfile.value;
+
     return Center(
       child: Stack(
         children: [
@@ -244,10 +316,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           image: FileImage(_profileImageFile!),
                           fit: BoxFit.cover,
                         )
+                        : profile?.profilePhotoUrl != null
+                        ? DecorationImage(
+                          image: MemoryImage(
+                            _convertBase64ToImage(profile!.profilePhotoUrl!),
+                          ),
+                          fit: BoxFit.cover,
+                        )
                         : null,
               ),
               child:
-                  _profileImageFile == null
+                  _profileImageFile == null && profile?.profilePhotoUrl == null
                       ? const Center(
                         child: Icon(
                           Icons.person,
@@ -324,6 +403,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             filled: false,
             isDense: maxLines == 1,
           ),
+          onChanged: (value) {
+            setState(() => _isFormChanged = true);
+          },
         ),
       ],
     );
@@ -378,7 +460,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _identityCardFilePath ?? 'No file selected',
+                        _identityCardFile != null
+                            ? _identityCardFilePath ?? 'Identity card selected'
+                            : 'No file selected',
                         style: TextStyle(color: Colors.grey[600]),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -449,6 +533,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (pickedFile != null) {
         setState(() {
           _profileImageFile = File(pickedFile.path);
+          _isFormChanged = true;
         });
       }
     } catch (e) {
@@ -508,6 +593,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         setState(() {
           _identityCardFile = File(pickedFile.path);
           _identityCardFilePath = pickedFile.name;
+          _isFormChanged = true;
         });
       }
     } catch (e) {
@@ -603,6 +689,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (success) {
         // Show success state
         isSuccess.value = true;
+        _isFormChanged = false;
 
         // Show success dialog
         Get.dialog(
@@ -766,5 +853,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // Helper method to convert base64 string to image bytes
+  Uint8List _convertBase64ToImage(String base64String) {
+    return base64Decode(base64String);
   }
 }

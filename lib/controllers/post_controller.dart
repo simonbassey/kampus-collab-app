@@ -13,8 +13,10 @@ class PostController extends GetxController {
   RxString error = ''.obs;
 
   // Load all posts
-  Future<void> loadPosts() async {
-    isLoading.value = true;
+  Future<void> loadPosts({bool showLoading = true}) async {
+    if (showLoading) {
+      isLoading.value = true;
+    }
     error.value = '';
 
     try {
@@ -42,7 +44,9 @@ class PostController extends GetxController {
       print('PostController: Error loading posts: $e');
       // Don't add mock data - let the UI show error state
     } finally {
-      isLoading.value = false;
+      if (showLoading) {
+        isLoading.value = false;
+      }
     }
   }
 

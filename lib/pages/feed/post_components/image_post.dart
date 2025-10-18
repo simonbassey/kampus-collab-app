@@ -8,8 +8,12 @@ class ImagePost extends StatelessWidget {
   final BuildContext? contextOverride;
   final bool isInDetailScreen;
 
-  ImagePost({Key? key, required this.post, this.contextOverride, this.isInDetailScreen = false})
-    : super(key: key);
+  ImagePost({
+    Key? key,
+    required this.post,
+    this.contextOverride,
+    this.isInDetailScreen = false,
+  }) : super(key: key);
 
   BuildContext _getContext() {
     // This is a workaround to access context for showing dialogs from a stateless widget
@@ -24,7 +28,11 @@ class ImagePost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PostBase(post: post, contentWidget: _buildImageContent(), isInDetailScreen: isInDetailScreen);
+    return PostBase(
+      post: post,
+      contentWidget: _buildImageContent(),
+      isInDetailScreen: isInDetailScreen,
+    );
   }
 
   Widget _buildImageContent() {
@@ -35,6 +43,11 @@ class ImagePost extends StatelessWidget {
     return Container(key: _contextHolder, child: _buildImages());
   }
 
+  // Helper to check if URL is a network URL
+  bool _isNetworkUrl(String url) {
+    return url.startsWith('http://') || url.startsWith('https://');
+  }
+
   Widget _buildImages() {
     if (post.images.isEmpty) {
       return const SizedBox.shrink();
@@ -42,18 +55,61 @@ class ImagePost extends StatelessWidget {
 
     // If only one image, show it full width
     if (post.images.length == 1) {
+      final imageUrl = post.images[0];
+      final isNetwork = _isNetworkUrl(imageUrl);
+
       return GestureDetector(
         onTap: () {
-          ImageViewer.show(_getContext(), post.images[0], isAsset: true);
+          ImageViewer.show(_getContext(), imageUrl, isAsset: !isNetwork);
         },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            post.images[0],
-            width: double.infinity,
-            height: 200,
-            fit: BoxFit.cover,
-          ),
+          child:
+              isNetwork
+                  ? Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        width: double.infinity,
+                        height: 200,
+                        color: const Color(0xFFEEF5FF),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value:
+                                loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                            color: const Color(0xFF5796FF),
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: double.infinity,
+                        height: 200,
+                        color: const Color(0xFFEEF5FF),
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                  : Image.asset(
+                    imageUrl,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                  ),
         ),
       );
     }
@@ -70,6 +126,9 @@ class ImagePost extends StatelessWidget {
       itemCount:
           post.images.length > 4 ? 4 : post.images.length, // Limit to 4 images
       itemBuilder: (context, index) {
+        final imageUrl = post.images[index];
+        final isNetwork = _isNetworkUrl(imageUrl);
+
         // If there are more than 4 images, the 4th thumbnail shows a +X overlay
         if (index == 3 && post.images.length > 4) {
           return GestureDetector(
@@ -80,12 +139,20 @@ class ImagePost extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    post.images[index],
-                    width: double.infinity,
-                    height: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
+                  child:
+                      isNetwork
+                          ? Image.network(
+                            imageUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                          : Image.asset(
+                            imageUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -116,12 +183,49 @@ class ImagePost extends StatelessWidget {
           },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              post.images[index],
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.cover,
-            ),
+            child:
+                isNetwork
+                    ? Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: const Color(0xFFEEF5FF),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value:
+                                  loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                              color: const Color(0xFF5796FF),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: const Color(0xFFEEF5FF),
+                          child: const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 32,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                    : Image.asset(
+                      imageUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
           ),
         );
       },
@@ -129,6 +233,8 @@ class ImagePost extends StatelessWidget {
   }
 
   void _showImageGallery(List<String> images, int initialIndex) {
-    ImageViewer.show(_getContext(), images[initialIndex], isAsset: true);
+    final imageUrl = images[initialIndex];
+    final isNetwork = _isNetworkUrl(imageUrl);
+    ImageViewer.show(_getContext(), imageUrl, isAsset: !isNetwork);
   }
 }

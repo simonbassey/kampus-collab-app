@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../../../models/school_person_model.dart';
 import '../../../widgets/safe_svg.dart';
 import '../../profile/view_profile_page.dart';
+import 'school_people_skeleton.dart';
 
 class SchoolPeopleSection extends StatefulWidget {
   const SchoolPeopleSection({Key? key}) : super(key: key);
@@ -71,10 +72,7 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const SchoolPeopleSkeletonLoader();
     }
 
     return Container(
@@ -82,6 +80,8 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Divider(color: Color(0xFFF0F0F0), height: 1, thickness: 1),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 18.0,
@@ -124,6 +124,8 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
                   (context, index) => _buildPersonCard(_people[index], index),
             ),
           ),
+          const SizedBox(height: 18),
+          const Divider(color: Color(0xFFF0F0F0), height: 1, thickness: 1),
         ],
       ),
     );
@@ -141,8 +143,36 @@ class _SchoolPeopleSectionState extends State<SchoolPeopleSection> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Image background
-          Image.network(person.avatarUrl, fit: BoxFit.cover),
+          // Image background with error handling
+          Image.network(
+            person.avatarUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              // Show a placeholder with person icon when image fails to load
+              return Container(
+                color: const Color(0xFFEEF5FF),
+                child: const Center(
+                  child: Icon(Icons.person, size: 80, color: Color(0xFF5796FF)),
+                ),
+              );
+            },
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                color: const Color(0xFFEEF5FF),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    value:
+                        loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                    color: const Color(0xFF5796FF),
+                  ),
+                ),
+              );
+            },
+          ),
           // Gradient overlay
           Container(
             decoration: BoxDecoration(

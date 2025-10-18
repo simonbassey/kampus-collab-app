@@ -17,9 +17,9 @@ class RichTextContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Detect URLs in content for preview
+    // Detect URLs in content for preview (deferred to avoid setState during build)
     _detectUrls(content);
-    
+
     return RichText(
       text: TextSpan(
         style: style ?? const TextStyle(fontSize: 14.0, color: Colors.black87),
@@ -29,17 +29,17 @@ class RichTextContent extends StatelessWidget {
   }
 
   void _detectUrls(String text) {
-    final urlPattern = RegExp(
-      r'https?://[^\s]+',
-      caseSensitive: false,
-    );
+    final urlPattern = RegExp(r'https?://[^\s]+', caseSensitive: false);
     final matches = urlPattern.allMatches(text);
-    
+
     if (matches.isNotEmpty && onUrlDetected != null) {
       // Notify parent widget about the first URL found
       final firstUrl = matches.first.group(0);
       if (firstUrl != null) {
-        onUrlDetected!(firstUrl);
+        // Defer the callback to avoid setState during build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          onUrlDetected!(firstUrl);
+        });
       }
     }
   }
@@ -63,9 +63,10 @@ class RichTextContent extends StatelessWidget {
       }
 
       final matchedText = match.group(0)!;
-      
+
       // Check if it's a URL
-      if (matchedText.startsWith('http://') || matchedText.startsWith('https://')) {
+      if (matchedText.startsWith('http://') ||
+          matchedText.startsWith('https://')) {
         // Handle URL
         spans.add(
           TextSpan(
@@ -75,13 +76,17 @@ class RichTextContent extends StatelessWidget {
               fontWeight: FontWeight.bold,
               decoration: TextDecoration.underline,
             ),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () async {
-                final uri = Uri.parse(matchedText);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+            recognizer:
+                TapGestureRecognizer()
+                  ..onTap = () async {
+                    final uri = Uri.parse(matchedText);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    }
+                  },
           ),
         );
       } else {
@@ -96,17 +101,18 @@ class RichTextContent extends StatelessWidget {
               color: Color(0xFF5796FF),
               fontWeight: FontWeight.bold,
             ),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () {
-                // Navigate to search page with the query
-                Get.toNamed(
-                  '/feed-search',
-                  arguments: {
-                    'searchQuery': searchQuery,
-                    'type': isHashtag ? 'hashtag' : 'mention',
+            recognizer:
+                TapGestureRecognizer()
+                  ..onTap = () {
+                    // Navigate to search page with the query
+                    Get.toNamed(
+                      '/feed-search',
+                      arguments: {
+                        'searchQuery': searchQuery,
+                        'type': isHashtag ? 'hashtag' : 'mention',
+                      },
+                    );
                   },
-                );
-              },
           ),
         );
       }

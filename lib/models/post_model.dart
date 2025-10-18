@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum PostType { text, image, link }
 
 // Content type from API
@@ -63,12 +65,25 @@ class PostModel {
       }
     }
 
-    // Handle the case where media URLs could be a string or a list
+    // Handle the case where media URLs could be a string, JSON string, or a list
     List<String> parseMediaUrls(dynamic mediaUrls) {
       if (mediaUrls == null) return [];
 
       if (mediaUrls is String) {
-        return [mediaUrls];
+        // Check if it's a JSON-encoded array string
+        if (mediaUrls.trim().startsWith('[')) {
+          try {
+            // Parse JSON string to list
+            final dynamic decoded = jsonDecode(mediaUrls);
+            if (decoded is List) {
+              return decoded.map((url) => url.toString()).toList();
+            }
+          } catch (e) {
+            print('Error parsing mediaUrls JSON: $e');
+          }
+        }
+        // Single URL string
+        return mediaUrls.isNotEmpty ? [mediaUrls] : [];
       } else if (mediaUrls is List) {
         return mediaUrls.map((url) => url.toString()).toList();
       }

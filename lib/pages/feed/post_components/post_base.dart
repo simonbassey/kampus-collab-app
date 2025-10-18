@@ -5,6 +5,7 @@ import '../../../models/post_model.dart';
 import '../../../controllers/post_controller.dart';
 import '../../../widgets/rich_text_content.dart';
 import '../../../widgets/url_link_preview.dart';
+import '../../../widgets/safe_network_image.dart';
 import 'post_detail_screen.dart';
 import '../../../pages/profile/view_profile_page.dart';
 
@@ -80,7 +81,8 @@ class _PostBaseState extends State<PostBase> {
                         },
                       ),
                       // Show URL preview if URL is detected
-                      if (_detectedUrl != null) UrlLinkPreview(url: _detectedUrl!),
+                      if (_detectedUrl != null)
+                        UrlLinkPreview(url: _detectedUrl!),
                       if (widget.contentWidget != null) ...[
                         const SizedBox(height: 12.0),
                         widget.contentWidget!,
@@ -103,17 +105,16 @@ class _PostBaseState extends State<PostBase> {
       children: [
         GestureDetector(
           onTap: () => _navigateToUserProfile(),
-          child: CircleAvatar(
-            radius: 20.0,
-            backgroundColor: Color(0xFFEEF5FF),
-            backgroundImage:
+          child: SafeNetworkAvatar(
+            imageUrl:
                 post.userAvatar.isNotEmpty && post.userAvatar.startsWith('http')
-                    ? NetworkImage(post.userAvatar)
+                    ? post.userAvatar
                     : null,
-            child:
-                post.userAvatar.isNotEmpty && post.userAvatar.startsWith('http')
-                    ? null
-                    : Icon(Icons.person, size: 24, color: Color(0xFF5796FF)),
+            radius: 20.0,
+            backgroundColor: const Color(0xFFEEF5FF),
+            fallbackIcon: Icons.person,
+            fallbackIconColor: const Color(0xFF5796FF),
+            fallbackIconSize: 24,
           ),
         ),
         const SizedBox(width: 12.0),
@@ -125,27 +126,33 @@ class _PostBaseState extends State<PostBase> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      post.userName,
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
-                        fontStyle: FontStyle.normal,
-                        fontSize: 16.0,
-                        letterSpacing: 0.0,
-                        color: Color(0xff333333),
+                    Flexible(
+                      child: Text(
+                        post.userName,
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 16.0,
+                          letterSpacing: 0.0,
+                          color: Color(0xff333333),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8.0),
-                    Text(
-                      post.userHandle,
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
-                        fontStyle: FontStyle.normal,
-                        fontSize: 12.0,
-                        letterSpacing: 0.0,
-                        color: Color(0xff333333),
+                    Flexible(
+                      child: Text(
+                        post.userHandle,
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 12.0,
+                          letterSpacing: 0.0,
+                          color: Color(0xff333333),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

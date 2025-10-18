@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../controllers/student_profile_controller.dart';
 import '../../controllers/post_controller.dart';
 import '../../services/post_creation_service.dart';
+import '../../services/supabase_storage_service.dart';
+import '../../services/supabase_service.dart';
 import '../profile/profile_page.dart';
 import '../../models/student_profile_model.dart';
 import '../../widgets/post_creation_toolbar.dart';
@@ -24,6 +26,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
   final StudentProfileController _profileController =
       Get.find<StudentProfileController>();
   final PostCreationService _postService = PostCreationService();
+  final SupabaseStorageService _storageService = SupabaseStorageService();
   final ImagePicker _imagePicker = ImagePicker();
   String _visibility = 'Everyone';
   bool _isPosting = false;
@@ -751,12 +754,93 @@ class _CreatePostPageState extends State<CreatePostPage> {
       _isPosting = true;
     });
 
+    List<String> uploadedImageUrls = [];
+
     try {
-      // Navigate to feed first
+      // Upload images to Supabase BEFORE navigating (if any)
+      if (_selectedImages.isNotEmpty) {
+        print(
+          'CreatePostPage: Uploading ${_selectedImages.length} images to Supabase',
+        );
+
+        // Check if Supabase is initialized
+        if (!SupabaseService.isInitialized) {
+          throw Exception(
+            'Supabase is not initialized. Please configure Supabase in your app.',
+          );
+        }
+
+        try {
+          // Show in-place loading dialog on create post screen
+          Get.dialog(
+            WillPopScope(
+              onWillPop: () async => false,
+              child: Dialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        color: Color(0xFF5796FF),
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Uploading ${_selectedImages.length} image(s)...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Inter',
+                          color: Colors.black87,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Please wait',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontFamily: 'Poppins',
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            barrierDismissible: false,
+          );
+
+          uploadedImageUrls = await _storageService.uploadPostImages(
+            _selectedImages,
+          );
+
+          print(
+            'CreatePostPage: Successfully uploaded ${uploadedImageUrls.length} images',
+          );
+          print('CreatePostPage: URLs: $uploadedImageUrls');
+
+          // Close upload dialog
+          Get.back();
+        } catch (e) {
+          // Close upload dialog if open
+          if (Get.isDialogOpen ?? false) {
+            Get.back();
+          }
+          throw Exception('Failed to upload images: $e');
+        }
+      }
+
+      // Navigate to feed AFTER successful upload
       Get.back(); // Close create post page
       Get.offAllNamed('/feed'); // Navigate to feed, clearing stack
 
-      // Now show progress on the feed screen using GetX snackbar at top
+      // Show creating post progress on feed (much faster now - just API call)
       Get.showSnackbar(
         GetSnackBar(
           message: 'Creating your post...',
@@ -765,7 +849,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
           progressIndicatorValueColor: AlwaysStoppedAnimation<Color>(
             Color(0xFF5796FF),
           ),
-          duration: Duration(seconds: 10), // Will be dismissed manually
+          duration: Duration(seconds: 10),
           isDismissible: false,
           backgroundColor: Colors.white,
           borderRadius: 0,
@@ -796,17 +880,17 @@ class _CreatePostPageState extends State<CreatePostPage> {
         ),
       );
 
-      // Create post using our post creation service
+      // Create post using our post creation service with image URLs
       await _postService.createPost(
         _postController.text,
         _visibility,
-        imagePaths: _selectedImages.map((file) => file.path).toList(),
+        imageUrls: uploadedImageUrls.isNotEmpty ? uploadedImageUrls : null,
       );
 
       // Dismiss progress snackbar
       Get.closeCurrentSnackbar();
 
-      // Show success snackbar with linear progress
+      // Show success snackbar
       Get.showSnackbar(
         GetSnackBar(
           message: 'Post created successfully!',
@@ -819,16 +903,29 @@ class _CreatePostPageState extends State<CreatePostPage> {
         ),
       );
 
-      // Reload posts on the feed
+      // Reload posts on the feed (silently, without showing skeleton loader)
       try {
         final postController = Get.find<PostController>();
-        await postController.loadPosts();
+        await postController.loadPosts(showLoading: false);
       } catch (e) {
         print('Error reloading posts: $e');
       }
     } catch (e) {
-      // Dismiss progress snackbar
+      // Dismiss any dialogs or snackbars
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
       Get.closeCurrentSnackbar();
+
+      // If images were uploaded but post creation failed, clean up
+      if (uploadedImageUrls.isNotEmpty) {
+        print('CreatePostPage: Cleaning up uploaded images due to error');
+        try {
+          await _storageService.deletePostImages(uploadedImageUrls);
+        } catch (cleanupError) {
+          print('CreatePostPage: Error cleaning up images: $cleanupError');
+        }
+      }
 
       // Clean error message before showing to user
       String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
@@ -838,7 +935,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
         GetSnackBar(
           message: cleanError,
           icon: Icon(Icons.error, color: Colors.white),
-          duration: Duration(seconds: 3),
+          duration: Duration(seconds: 4),
           backgroundColor: Colors.red,
           borderRadius: 0,
           margin: EdgeInsets.zero,

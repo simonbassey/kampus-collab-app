@@ -10,7 +10,8 @@ class PostCreationService {
   Future<Map<String, dynamic>> createPost(
     String content,
     String visibility, {
-    List<String>? imagePaths,
+    List<String>? imagePaths, // Deprecated: use imageUrls instead
+    List<String>? imageUrls, // Image URLs from Supabase storage
   }) async {
     // Check authentication
     if (!_authController.isAuthenticated.value) {
@@ -22,9 +23,12 @@ class PostCreationService {
       throw Exception('User is not authenticated');
     }
 
+    // Use imageUrls if provided, otherwise fall back to imagePaths for backward compatibility
+    final mediaUrls = imageUrls ?? imagePaths ?? [];
+
     // Determine content type based on whether images are provided
     String contentType = 'Text';
-    if (imagePaths != null && imagePaths.isNotEmpty) {
+    if (mediaUrls.isNotEmpty) {
       contentType = 'Image';
     }
 
@@ -37,7 +41,7 @@ class PostCreationService {
       body: jsonEncode({
         'content': content,
         'contentType': contentType,
-        'mediaUrls': imagePaths ?? [],
+        'mediaUrls': mediaUrls,
         'audience': _convertVisibilityToApiValue(visibility),
         // Don't include parentId for original posts (backend validation issue)
         'postType': 'Original',

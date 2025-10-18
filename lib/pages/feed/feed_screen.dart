@@ -4,6 +4,7 @@ import 'package:inkstryq/widgets/custom_bottom_navbar.dart';
 import '_widgets/feed_app_bar.dart';
 import '_widgets/profile_setup_modal.dart';
 import '_widgets/school_people_section.dart';
+import '_widgets/post_skeleton_loader.dart';
 import 'post_components/text_post.dart';
 import 'post_components/image_post.dart';
 import 'post_components/link_post.dart';
@@ -28,6 +29,27 @@ class _FeedScreenState extends State<FeedScreen>
 
   // For local state
   List<PostModel> get _posts => _postController.posts;
+
+  // Calculate strategic position for SchoolPeopleSection
+  int _getSchoolPeopleSectionPosition() {
+    final totalPosts = _posts.length;
+
+    // Strategic placement based on number of posts:
+    // 1-2 posts: after post 1 (index 0)
+    // 3-5 posts: after post 2 (index 1)
+    // 6-8 posts: after post 3 (index 2)
+    // 9+ posts: after post 4 (index 3)
+
+    if (totalPosts <= 2) {
+      return 1; // After first post
+    } else if (totalPosts <= 5) {
+      return 2; // After second post
+    } else if (totalPosts <= 8) {
+      return 3; // After third post
+    } else {
+      return 4; // After fourth post
+    }
+  }
 
   @override
   void initState() {
@@ -83,26 +105,7 @@ class _FeedScreenState extends State<FeedScreen>
   }
 
   Widget _buildLoadingState() {
-    return ListView(
-      children: [
-        SizedBox(height: 100),
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5796FF)),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Loading posts...',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+    return const PostSkeletonLoaderList(itemCount: 4);
   }
 
   Widget _buildEmptyState() {
@@ -283,56 +286,56 @@ class _FeedScreenState extends State<FeedScreen>
                     return _buildEmptyState();
                   }
 
-                  // Posts list
-                  return ListView(
-                    children: [
-                      // First post (if available)
-                      if (_posts.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: _buildPostByType(_posts[0]),
-                        ),
+                  // Posts list with strategically placed SchoolPeopleSection
+                  return ListView.builder(
+                    itemCount:
+                        _posts.length +
+                        2, // +2 for SchoolPeopleSection and bottom padding
+                    itemBuilder: (context, index) {
+                      final schoolPeoplePosition =
+                          _getSchoolPeopleSectionPosition();
 
-                      // People in your school section after first post
-                      const SchoolPeopleSection(),
+                      // Show School People Section at strategic position
+                      if (index == schoolPeoplePosition) {
+                        return const SchoolPeopleSection();
+                      }
 
-                      // Rest of the posts
-                      SizedBox(
-                        // Calculate height to fit the rest of the screen
-                        height:
-                            MediaQuery.of(context).size.height -
-                            (kToolbarHeight + // AppBar
-                                MediaQuery.of(
-                                  context,
-                                ).padding.top + // Status bar
-                                kBottomNavigationBarHeight + // Bottom nav
-                                400), // School people section + first post + margins
-                        child:
-                            _posts.length <= 1
-                                ? Center(
-                                  child: Text('No more posts to display'),
-                                )
-                                : ListView.separated(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                  ),
-                                  itemCount: _posts.length - 1,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  separatorBuilder:
-                                      (context, index) => Divider(
-                                        color: const Color(0xFFF0F0F0),
-                                        height: 1,
-                                        thickness: 1,
-                                      ),
-                                  itemBuilder: (context, index) {
-                                    // Add +1 to index since we're skipping the first post
-                                    return _buildPostByType(_posts[index + 1]);
-                                  },
-                                ),
-                      ),
-                      SizedBox(height: 40),
-                    ],
+                      // Bottom padding at the end
+                      if (index == _posts.length + 1) {
+                        return const SizedBox(height: 40);
+                      }
+
+                      // Calculate actual post index
+                      // If we're before the school people section, use index as-is
+                      // If we're after it, subtract 1 to account for the section
+                      final postIndex =
+                          index > schoolPeoplePosition ? index - 1 : index;
+
+                      // Make sure we're within bounds
+                      if (postIndex >= _posts.length) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // Build post with divider
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            child: _buildPostByType(_posts[postIndex]),
+                          ),
+                          // Add divider after each post (except before SchoolPeopleSection and after last post)
+                          if (index != schoolPeoplePosition - 1 &&
+                              postIndex < _posts.length - 1)
+                            const Divider(
+                              color: Color(0xFFF0F0F0),
+                              height: 1,
+                              thickness: 1,
+                            ),
+                        ],
+                      );
+                    },
                   );
                 }), // Close the Obx
               ),
