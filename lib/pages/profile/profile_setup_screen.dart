@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/student_profile_controller.dart';
+import '../../utils/error_message_helper.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -12,11 +15,10 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _bioController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _skillController = TextEditingController();
+  final TextEditingController _shortBioController = TextEditingController();
   final TextEditingController _identityNumberController =
+      TextEditingController();
+  final TextEditingController _academicEmailController =
       TextEditingController();
 
   // Get the StudentProfileController
@@ -30,13 +32,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Selected profile image file
   File? _profileImageFile;
 
-  // Selected student ID file
-  File? _idCardFile;
-  String? _idCardFilePath;
+  // Selected identity card file
+  File? _identityCardFile;
+  String? _identityCardFilePath;
 
   // Loading state
   RxBool isLoading = false.obs;
   RxBool isFetchingProfile = false.obs;
+  RxBool isSuccess = false.obs;
+
+  // Form change tracking
+  bool _isFormChanged = false;
 
   @override
   void initState() {
@@ -49,7 +55,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> _fetchCurrentProfileData() async {
     isFetchingProfile.value = true;
     try {
-      // First try the new API endpoint
+      // Check if profile is already loaded (from preload service)
+      if (_profileController.studentProfile.value != null) {
+        print('ProfileSetupScreen: Profile already loaded, using cached data');
+        _populateFormWithProfileData();
+        isFetchingProfile.value = false;
+        return;
+      }
+
+      // Fetch from API if not cached
+      print('ProfileSetupScreen: No cached data, fetching from API...');
       await _profileController.fetchCurrentUserProfile();
 
       // If profile was successfully fetched, populate the form
@@ -58,14 +73,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
     } catch (e) {
       print('Error fetching profile data: $e');
-      // Show a snackbar with the error
-      Get.snackbar(
-        'Error',
-        'Could not load your profile data: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      // Don't show error snackbar - just log it
+      print('ProfileSetupScreen: Will use empty form');
     } finally {
       isFetchingProfile.value = false;
     }
@@ -74,37 +83,46 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   // Populate form fields with existing profile data
   void _populateFormWithProfileData() {
     final profile = _profileController.studentProfile.value;
-    if (profile != null) {
-      // Set the text controllers with existing data
-      if (profile.fullName?.isNotEmpty == true) {
-        _nameController.text = profile.fullName!;
-      }
 
-      if (profile.email?.isNotEmpty == true) {
-        _emailController.text = profile.email!;
-      }
-
-      if (profile.shortBio?.isNotEmpty == true) {
-        _bioController.text = profile.shortBio!;
-      }
-
-      if (profile.academicDetails?.identityNumber?.isNotEmpty == true) {
-        _identityNumberController.text =
-            profile.academicDetails!.identityNumber!;
-      }
-
-      // Note: For profile image and ID card, we cannot set File objects directly.
-      // We would need to store the paths or URLs and display them, but we won't
-      // modify the actual File objects until the user selects new files.
+    if (profile == null) {
+      print('ProfileSetupScreen: No profile to populate');
+      return;
     }
+
+    print('ProfileSetupScreen: Populating form with profile data...');
+
+    // Set the text controllers with existing data
+    if (profile.shortBio?.isNotEmpty == true) {
+      _shortBioController.text = profile.shortBio!;
+      print('ProfileSetupScreen: Loaded bio: ${profile.shortBio}');
+    }
+
+    // Load identity number from either direct field or academic details
+    final identityNumber =
+        profile.identityNumber ?? profile.academicDetails?.identityNumber;
+    if (identityNumber?.isNotEmpty == true) {
+      _identityNumberController.text = identityNumber!;
+      print('ProfileSetupScreen: Loaded identity number: $identityNumber');
+    }
+
+    // Load email
+    if (profile.email.isNotEmpty) {
+      _academicEmailController.text = profile.email;
+      print('ProfileSetupScreen: Loaded email: ${profile.email}');
+    }
+
+    print('ProfileSetupScreen: Form population complete');
+
+    // Note: For profile image and identity card, we cannot set File objects directly.
+    // We would need to store the paths or URLs and display them, but we won't
+    // modify the actual File objects until the user selects new files.
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _bioController.dispose();
-    _emailController.dispose();
-    _skillController.dispose();
+    _shortBioController.dispose();
+    _identityNumberController.dispose();
+    _academicEmailController.dispose();
     super.dispose();
   }
 
@@ -115,33 +133,98 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: Row(
-          children: [
-            SizedBox(width: 16),
-            Container(
-              height: 32,
-              width: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF5FF),
-                borderRadius: BorderRadius.circular(1000),
-              ),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 16,
-                  color: Color(0xff5796FF),
-                ),
-                onPressed: () => Get.back(),
-              ),
+        automaticallyImplyLeading: false,
+        leading: GestureDetector(
+          onTap: () {
+            if (_isFormChanged) {
+              showDialog(
+                context: context,
+                builder:
+                    (context) => AlertDialog(
+                      backgroundColor: Colors.white,
+                      title: const Text(
+                        'Discard Changes?',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 18,
+                          letterSpacing: -0.41,
+                          color: Color(0xff333333),
+                        ),
+                      ),
+                      content: const Text(
+                        'You have unsaved changes. Are you sure you want to discard them?',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w400,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 16,
+                          letterSpacing: -0.41,
+                          color: Color(0xff333333),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              fontStyle: FontStyle.normal,
+                              fontSize: 16,
+                              letterSpacing: -0.41,
+                              color: Color(0xff333333),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Get.back();
+                          },
+                          child: const Text(
+                            'Discard',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w500,
+                              fontStyle: FontStyle.normal,
+                              fontSize: 16,
+                              letterSpacing: -0.41,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+              );
+            } else {
+              Get.back();
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.only(left: 16, bottom: 16),
+            height: 20,
+            width: 20,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF5FF),
+              borderRadius: BorderRadius.circular(1000),
             ),
-          ],
+            child: const Icon(
+              Icons.arrow_back_ios_new,
+              size: 16,
+              color: Color(0xff5796FF),
+            ),
+          ),
         ),
         actions: [
           Obx(
             () =>
-                isLoading.value
+                _profileController.isSaving.value || isLoading.value
                     ? Container(
                       padding: const EdgeInsets.only(right: 16),
+                      margin: const EdgeInsets.only(bottom: 16),
                       child: const Center(
                         child: SizedBox(
                           height: 20,
@@ -185,32 +268,26 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               _buildProfileAvatar(),
               const SizedBox(height: 32),
               _buildTextField(
-                label: 'User Name',
-                controller: _nameController,
-                placeholder: 'Precious_Eyo',
-              ),
-              const SizedBox(height: 24),
-              _buildTextField(
-                label: 'Bio',
-                controller: _bioController,
+                label: 'Short Bio',
+                controller: _shortBioController,
                 placeholder: 'Tell your friends about yourself',
                 maxLines: 3,
               ),
               const SizedBox(height: 24),
-              _buildStudentIdUpload(),
+              _buildTextField(
+                label: 'Identity Number',
+                controller: _identityNumberController,
+                placeholder: 'Your student ID number',
+              ),
               const SizedBox(height: 24),
               _buildTextField(
-                label: 'Institutional email address',
-                controller: _emailController,
-                placeholder: 'preciouseyo@unicross.mail',
+                label: 'Academic Email',
+                controller: _academicEmailController,
+                placeholder: 'your.email@university.edu',
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 24),
-              _buildTextField(
-                label: 'Skill as a service',
-                controller: _skillController,
-                placeholder: 'E.g tailor, phone engineer',
-              ),
+              _buildIdentityCardUpload(),
               const SizedBox(height: 40),
             ],
           ),
@@ -220,6 +297,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Widget _buildProfileAvatar() {
+    final profile = _profileController.studentProfile.value;
+
     return Center(
       child: Stack(
         children: [
@@ -237,10 +316,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           image: FileImage(_profileImageFile!),
                           fit: BoxFit.cover,
                         )
+                        : profile?.profilePhotoUrl != null
+                        ? DecorationImage(
+                          image: MemoryImage(
+                            _convertBase64ToImage(profile!.profilePhotoUrl!),
+                          ),
+                          fit: BoxFit.cover,
+                        )
                         : null,
               ),
               child:
-                  _profileImageFile == null
+                  _profileImageFile == null && profile?.profilePhotoUrl == null
                       ? const Center(
                         child: Icon(
                           Icons.person,
@@ -317,17 +403,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             filled: false,
             isDense: maxLines == 1,
           ),
+          onChanged: (value) {
+            setState(() => _isFormChanged = true);
+          },
         ),
       ],
     );
   }
 
-  Widget _buildStudentIdUpload() {
+  Widget _buildIdentityCardUpload() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Upload student ID',
+          'Upload Identity Card',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -371,19 +460,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _idCardFilePath ?? 'No file selected',
+                        _identityCardFile != null
+                            ? _identityCardFilePath ?? 'Identity card selected'
+                            : 'No file selected',
                         style: TextStyle(color: Colors.grey[600]),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                if (_idCardFile != null) ...[
+                if (_identityCardFile != null) ...[
                   const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.file(
-                      _idCardFile!,
+                      _identityCardFile!,
                       height: 120,
                       width: double.infinity,
                       fit: BoxFit.cover,
@@ -434,14 +525,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        maxWidth: 200,
+        maxHeight: 200,
+        imageQuality: 50,
       );
 
       if (pickedFile != null) {
         setState(() {
           _profileImageFile = File(pickedFile.path);
+          _isFormChanged = true;
         });
       }
     } catch (e) {
@@ -492,15 +584,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 50,
       );
 
       if (pickedFile != null) {
         setState(() {
-          _idCardFile = File(pickedFile.path);
-          _idCardFilePath = pickedFile.name;
+          _identityCardFile = File(pickedFile.path);
+          _identityCardFilePath = pickedFile.name;
+          _isFormChanged = true;
         });
       }
     } catch (e) {
@@ -516,71 +609,243 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_nameController.text.isEmpty) {
-      Get.snackbar(
-        'Error',
-        'Please enter a username',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return;
-    }
+    print('Save button clicked');
 
-    if (_emailController.text.isEmpty) {
-      Get.snackbar(
-        'Error',
-        'Please enter an email address',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
+    // No required fields for now - all fields are optional
+    print('Starting save...');
     // Set loading state
     isLoading.value = true;
+    isSuccess.value = false;
+
+    // Show loading dialog
+    Get.dialog(
+      WillPopScope(
+        onWillPop: () async => false, // Prevent dismissing by tapping outside
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  color: Color(0xFF5796FF),
+                  strokeWidth: 3,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  'Saving your profile...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Inter',
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Please wait',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Poppins',
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
 
     bool success = false;
     try {
-      // Check if we're updating an existing profile or creating a new one
-      final existingProfile = _profileController.studentProfile.value;
+      // Try updating/creating profile using the new API
+      print('Attempting to save profile with new API...');
+      success = await _profileController.updateProfileWithNewAPI(
+        shortBio:
+            _shortBioController.text.isNotEmpty
+                ? _shortBioController.text
+                : null,
+        identityNumber:
+            _identityNumberController.text.isNotEmpty
+                ? _identityNumberController.text
+                : null,
+        academicEmail:
+            _academicEmailController.text.isNotEmpty
+                ? _academicEmailController.text
+                : null,
+        profileImageFile: _profileImageFile,
+        idCardFile: _identityCardFile,
+      );
 
-      if (existingProfile != null && existingProfile.academicDetails != null) {
-        // Updating existing profile
-        success = await _profileController.updateProfile(
-          fullName: _nameController.text,
-          email: _emailController.text,
-          shortBio: _bioController.text,
-          idCardFile: _idCardFile,
-          identityNumber: _identityNumberController.text,
-          profileImageFile: _profileImageFile,
+      // Close loading dialog
+      Get.back();
+
+      if (success) {
+        // Show success state
+        isSuccess.value = true;
+        _isFormChanged = false;
+
+        // Show success dialog
+        Get.dialog(
+          Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 40,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    'Success!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Your profile has been updated successfully',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Poppins',
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back(); // Close success dialog
+                        Get.back(); // Navigate back to profile page
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF5796FF),
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Continue',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      } else {
+        // Clean the error message to remove URLs and technical details
+        String errorMessage = ErrorMessageHelper.getUserFriendlyMessage(
+          _profileController.error.value,
         );
 
-        if (success) {
-          Get.snackbar(
-            'Success',
-            'Profile updated successfully',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
+        // Check if it's the "profile not found" error - show dialog with option to go to academic details
+        if (errorMessage.contains('academic details')) {
+          Get.dialog(
+            AlertDialog(
+              backgroundColor: Colors.white,
+              title: Text(
+                'Academic Details Required',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              content: Text(
+                'You need to set up your academic details before updating your profile. Would you like to do that now?',
+                style: TextStyle(fontSize: 16, fontFamily: 'Poppins'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Get.back(); // Close dialog
+                  },
+                  child: Text(
+                    'Later',
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Get.back(); // Close dialog
+                    Get.back(); // Close profile setup
+                    Get.toNamed('/academic-details'); // Go to academic details
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF5796FF),
+                  ),
+                  child: Text(
+                    'Set Up Now',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
-          // Navigate back to profile page
-          Get.back();
         } else {
           Get.snackbar(
             'Error',
-            'Failed to update profile: ${_profileController.error.value}',
+            errorMessage,
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.red,
             colorText: Colors.white,
+            duration: Duration(seconds: 5),
           );
         }
       }
     } catch (e) {
+      // Close loading dialog if still open
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
+      // Clean the exception message
+      String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
+
       Get.snackbar(
         'Error',
-        'An error occurred: $e',
+        cleanError,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -588,5 +853,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // Helper method to convert base64 string to image bytes
+  Uint8List _convertBase64ToImage(String base64String) {
+    return base64Decode(base64String);
   }
 }

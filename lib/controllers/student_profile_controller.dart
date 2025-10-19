@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:get/get.dart';
-import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../models/student_profile_model.dart';
 import '../services/student_profile_service.dart';
 import '../controllers/auth_controller.dart';
+import '../constants/api.dart';
 
 class StudentProfileController extends GetxController {
   final StudentProfileService _profileService = StudentProfileService();
@@ -166,7 +167,7 @@ class StudentProfileController extends GetxController {
     }
   }
 
-  // Method to update an existing profile
+  // Method to update an existing profile using the legacy API
   Future<bool> updateProfile({
     String? fullName,
     String? email,
@@ -191,6 +192,7 @@ class StudentProfileController extends GetxController {
       // Default to existing values or placeholder as fallback
       String identityCardBase64 =
           studentProfile.value!.academicDetails?.identityCardBase64 ??
+          studentProfile.value!.identityCardBase64 ??
           'placeholder_image_data';
       String profilePictureBase64 =
           studentProfile.value!.profilePhotoUrl ?? 'placeholder_image_data';
@@ -229,14 +231,21 @@ class StudentProfileController extends GetxController {
         email: email ?? studentProfile.value!.email,
         profilePhotoUrl: profilePictureBase64,
         shortBio: shortBio ?? studentProfile.value!.shortBio,
+        // Preserve existing follower and following counts
+        followerCount: studentProfile.value!.followerCount,
+        followingCount: studentProfile.value!.followingCount,
+        postCount: studentProfile.value!.postCount,
         academicDetails: AcadmicProfileDetails(
           institutionId:
-              studentProfile.value!.academicDetails?.institutionId ?? 0,
+              studentProfile.value!.academicDetails?.institutionId ??
+              studentProfile.value!.institutionId ??
+              0,
           institutionName:
               studentProfile.value!.academicDetails?.institutionName ?? '',
           departmentOrProgramId:
               departmentOrProgramId ??
               studentProfile.value!.academicDetails?.departmentOrProgramId ??
+              studentProfile.value!.departmentOrProgramId ??
               0,
           departmentOrProgramName:
               studentProfile.value!.academicDetails?.departmentOrProgramName ??
@@ -244,6 +253,7 @@ class StudentProfileController extends GetxController {
           facultyOrDisciplineId:
               facultyOrDisciplineId ??
               studentProfile.value!.academicDetails?.facultyOrDisciplineId ??
+              studentProfile.value!.facultyId ??
               0,
           facultyOrDisciplineName:
               studentProfile.value!.academicDetails?.facultyOrDisciplineName ??
@@ -251,24 +261,159 @@ class StudentProfileController extends GetxController {
           yearOfStudy:
               yearOfStudy ??
               studentProfile.value!.academicDetails?.yearOfStudy ??
+              studentProfile.value!.yearOfStudy ??
               0,
           identityCardBase64: identityCardBase64,
           identityNumber:
               identityNumber ??
               studentProfile.value!.academicDetails?.identityNumber ??
+              studentProfile.value!.identityNumber ??
               '',
         ),
       );
 
-      final result = await _profileService.updateProfile(
-        studentProfile.value!.userId!,
-        updatedProfile,
-      );
+      // Try to create a profile if it doesn't exist yet, then update it
+      try {
+        bool profileExists = await _checkProfileExists();
 
-      studentProfile.value = result;
-      return true;
+        if (!profileExists) {
+          print('Profile does not exist yet, attempting to create one...');
+          // Try to create a minimal profile first
+          final createSuccess = await _createMinimalProfile(
+            shortBio: shortBio,
+            identityNumber: identityNumber,
+          );
+
+          if (!createSuccess) {
+            print(
+              'Failed to create minimal profile, trying legacy approach...',
+            );
+            final result = await _profileService.updateProfile(
+              studentProfile.value!.userId!,
+              updatedProfile,
+            );
+
+            studentProfile.value = result;
+            return true;
+          }
+        }
+
+        // Now try the update with the new API
+        return await updateProfileWithNewAPI(
+          shortBio: shortBio,
+          identityNumber: identityNumber,
+          profileImageFile: profileImageFile,
+          idCardFile: idCardFile,
+          // Academic fields removed as requested
+        );
+      } catch (newApiError) {
+        print('New API update failed: $newApiError. Trying legacy approach.');
+        // If new API fails, fall back to legacy approach
+        final result = await _profileService.updateProfile(
+          studentProfile.value!.userId!,
+          updatedProfile,
+        );
+
+        studentProfile.value = result;
+        return true;
+      }
     } catch (e) {
       error.value = 'Failed to update profile: $e';
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  // New method to update profile using the new API endpoint
+  Future<bool> updateProfileWithNewAPI({
+    String? shortBio,
+    String? identityNumber,
+    String? academicEmail,
+    File? profileImageFile,
+    File? idCardFile,
+  }) async {
+    if (!_authController.isAuthenticated.value) {
+      error.value = 'User not authenticated';
+      return false;
+    }
+
+    isSaving.value = true;
+    error.value = '';
+
+    try {
+      // Build the request payload
+      final Map<String, dynamic> profileData = {};
+
+      // Only include fields that are provided, using field names from API documentation
+      // /api/profile/me PUT endpoint expects these exact field names
+      if (shortBio != null) profileData['shortBio'] = shortBio;
+      if (identityNumber != null)
+        profileData['identityNumber'] = identityNumber;
+      if (academicEmail != null) profileData['academicEmail'] = academicEmail;
+
+      // Handle profile image if provided
+      if (profileImageFile != null) {
+        try {
+          print('Encoding profile image for update with new API...');
+          final bytes = await profileImageFile.readAsBytes();
+          final base64Image = base64Encode(bytes);
+
+          // Validate size - API has 4000 character limit
+          if (base64Image.length > 4000) {
+            print(
+              'Warning: Profile image is too large (${base64Image.length} chars). Maximum is 4000. Skipping image upload.',
+            );
+            // Don't set error value here - we'll still try to update other fields
+            // Just log the warning
+          } else {
+            // The API expects 'profilePhotoUrl' field for the base64 encoded image
+            profileData['profilePhotoUrl'] = base64Image;
+            print(
+              'Profile image encoded successfully (${base64Image.length} chars)',
+            );
+          }
+        } catch (e) {
+          print('Error encoding profile image: $e');
+        }
+      }
+
+      // Handle ID card image if provided
+      if (idCardFile != null) {
+        try {
+          print('Encoding ID card image for update with new API...');
+          final bytes = await idCardFile.readAsBytes();
+          final base64IdCard = base64Encode(bytes);
+
+          // Validate size - API has 4000 character limit
+          if (base64IdCard.length > 4000) {
+            print(
+              'Warning: ID card image is too large (${base64IdCard.length} chars). Maximum is 4000. Skipping ID card upload.',
+            );
+            // Don't set error value here - we'll still try to update other fields
+            // Just log the warning
+          } else {
+            profileData['identityCardBase64'] = base64IdCard;
+            print(
+              'ID card image encoded successfully (${base64IdCard.length} chars)',
+            );
+          }
+        } catch (e) {
+          print('Error encoding ID card image: $e');
+        }
+      }
+
+      // Make the API call
+      print('Updating profile with new API: $profileData');
+      final updatedProfile = await _profileService.updateUserProfile(
+        profileData,
+      );
+
+      // Update the local profile data
+      studentProfile.value = updatedProfile;
+      return true;
+    } catch (e) {
+      error.value = 'Failed to update profile with new API: $e';
       return false;
     } finally {
       isSaving.value = false;
@@ -392,6 +537,74 @@ class StudentProfileController extends GetxController {
       'Has Identity Card: ${profile.academicDetails?.identityCardBase64 != null}',
     );
     print('Has Profile Picture: ${profile.profilePhotoUrl != null}');
+    print('Follower Count: ${profile.followerCount}');
+    print('Following Count: ${profile.followingCount}');
+    print('Post Count: ${profile.postCount}');
     print('=============== END PROFILE DETAILS ===============');
+  }
+
+  // Check if the current user's profile exists
+  Future<bool> _checkProfileExists() async {
+    try {
+      await _profileService.getCurrentUserProfile();
+      return true;
+    } catch (e) {
+      print('Profile may not exist: $e');
+      return false;
+    }
+  }
+
+  // Create a minimal profile with required fields
+  Future<bool> _createMinimalProfile({
+    String? shortBio,
+    String? identityNumber,
+  }) async {
+    try {
+      print('Attempting to create a minimal profile');
+
+      // Create a minimal profile with just the required fields
+      final Map<String, dynamic> profileData = {'shortBio': shortBio ?? ''};
+
+      if (identityNumber != null && identityNumber.isNotEmpty) {
+        profileData['identityNumber'] = identityNumber;
+      }
+
+      // Try creating the profile using POST
+      final apiUrl = '${ApiConstants.baseUrl}/api/profile/me';
+      final token = await _authController.getAuthToken();
+
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      print('Creating profile with data: $profileData');
+
+      final client = http.Client();
+      try {
+        // Skip trying POST first since it doesn't work (404)
+        // Directly use PUT since that's the only working endpoint
+        print('REQUEST TYPE: PUT - Creating minimal profile');
+        final putResponse = await client.put(
+          Uri.parse(apiUrl),
+          headers: headers,
+          body: jsonEncode(profileData),
+        );
+
+        print('PUT Profile Response: ${putResponse.statusCode}');
+        print('PUT Profile Body: ${putResponse.body}');
+
+        return putResponse.statusCode == 200;
+      } finally {
+        client.close();
+      }
+    } catch (e) {
+      print('Error creating minimal profile: $e');
+      return false;
+    }
   }
 }

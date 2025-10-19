@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'dart:async';
 import '../services/auth_service.dart';
+import '../services/data_preload_service.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -39,7 +40,22 @@ class AuthController extends GetxController {
   // Check if user has a valid token
   Future<void> checkAuthStatus() async {
     final token = await _authService.getToken();
+    final wasAuthenticated = isAuthenticated.value;
     isAuthenticated.value = token != null && token.isNotEmpty;
+
+    // If user is authenticated and this is first check, preload data
+    if (isAuthenticated.value && !wasAuthenticated) {
+      print(
+        'AuthController: User authenticated on startup, preloading data...',
+      );
+      DataPreloadService.preloadEssentialData()
+          .then((_) {
+            print('AuthController: Startup data preload completed');
+          })
+          .catchError((e) {
+            print('AuthController: Startup data preload error: $e');
+          });
+    }
   }
 
   // Initiate signup process
@@ -65,11 +81,25 @@ class AuthController extends GetxController {
         return false;
       }
 
+      // Additional validation for known problematic patterns
+      if (email.contains('arqsis.com') ||
+          email.contains('temp-mail.org') ||
+          email.contains('10minutemail')) {
+        errorMessage.value =
+            'This email domain is not supported. Please use a different email address.';
+        return false;
+      }
+
       // Split full name into first and last name
       final nameParts = fullName.trim().split(' ');
+
+      if (nameParts.length < 2) {
+        errorMessage.value = 'Please enter both first and last name';
+        return false;
+      }
+
       String firstName = nameParts[0];
-      String lastName =
-          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      String lastName = nameParts.sublist(1).join(' ');
 
       // Store email for OTP verification
       currentEmail.value = email;
@@ -124,6 +154,17 @@ class AuthController extends GetxController {
 
       if (result['success']) {
         isAuthenticated.value = true;
+
+        // Preload essential data in the background after signup
+        print('AuthController: Signup completed, starting data preload...');
+        DataPreloadService.preloadEssentialData()
+            .then((_) {
+              print('AuthController: Background data preload completed');
+            })
+            .catchError((e) {
+              print('AuthController: Background data preload error: $e');
+            });
+
         return true;
       } else {
         errorMessage.value = result['message'] ?? 'Failed to verify OTP';
@@ -178,8 +219,13 @@ class AuthController extends GetxController {
       isAuthenticated.value = false;
       currentEmail.value = '';
       errorMessage.value = '';
+
+      // Navigate to login page and clear all previous routes
+      Get.offAllNamed('/login');
     } catch (e) {
       errorMessage.value = 'Failed to logout: ${e.toString()}';
+      // Even if logout fails, still navigate to login
+      Get.offAllNamed('/login');
     } finally {
       isLoading.value = false;
     }
@@ -214,6 +260,17 @@ class AuthController extends GetxController {
 
       if (result['success']) {
         isAuthenticated.value = true;
+
+        // Preload essential data in the background (don't await to avoid blocking UI)
+        print('AuthController: Login successful, starting data preload...');
+        DataPreloadService.preloadEssentialData()
+            .then((_) {
+              print('AuthController: Background data preload completed');
+            })
+            .catchError((e) {
+              print('AuthController: Background data preload error: $e');
+            });
+
         return {'success': true};
       } else if (result['needsVerification'] == true) {
         // Email not verified, store the email for the verification flow

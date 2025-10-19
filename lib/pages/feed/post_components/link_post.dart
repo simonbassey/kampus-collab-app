@@ -9,20 +9,25 @@ class LinkPost extends StatelessWidget {
   final BuildContext? contextOverride;
   final bool isInDetailScreen;
   final GlobalKey _contextHolder = GlobalKey();
-  
-   LinkPost({
+
+  LinkPost({
     Key? key,
     required this.post,
     this.contextOverride,
     this.isInDetailScreen = false,
   }) : super(key: key);
-  
+
   BuildContext _getContext() {
     // This is a workaround to access context for showing dialogs from a stateless widget
     if (contextOverride != null) return contextOverride!;
     final context = _contextHolder.currentContext;
     if (context == null) throw Exception('Context is not available');
     return context;
+  }
+
+  // Helper to check if URL is a network URL
+  bool _isNetworkUrl(String url) {
+    return url.startsWith('http://') || url.startsWith('https://');
   }
 
   @override
@@ -38,13 +43,10 @@ class LinkPost extends StatelessWidget {
     if (post.link == null || post.link!.isEmpty) {
       return const SizedBox.shrink();
     }
-    
-    return Container(
-      key: _contextHolder,
-      child: _buildLinkContent(),
-    );
+
+    return Container(key: _contextHolder, child: _buildLinkContent());
   }
-  
+
   Widget _buildLinkContent() {
     if (post.link == null || post.link!.isEmpty) {
       return const SizedBox.shrink();
@@ -64,20 +66,56 @@ class LinkPost extends StatelessWidget {
           if (post.images.isNotEmpty)
             GestureDetector(
               onTap: () {
-                ImageViewer.show(
-                  _getContext(),
-                  post.images.first,
-                  isAsset: true,
-                );
+                final imageUrl = post.images.first;
+                final isNetwork = _isNetworkUrl(imageUrl);
+                ImageViewer.show(_getContext(), imageUrl, isAsset: !isNetwork);
               },
-              child: Image.asset(
-                post.images.first,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+              child:
+                  _isNetworkUrl(post.images.first)
+                      ? Image.network(
+                        post.images.first,
+                        height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 150,
+                            color: const Color(0xFFEEF5FF),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value:
+                                    loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress
+                                                .cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                                color: const Color(0xFF5796FF),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 150,
+                            color: const Color(0xFFEEF5FF),
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                      : Image.asset(
+                        post.images.first,
+                        height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
             ),
-          
+
           // Link Content
           Padding(
             padding: const EdgeInsets.all(12.0),
@@ -93,9 +131,9 @@ class LinkPost extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                
+
                 const SizedBox(height: 4),
-                
+
                 // Link Title
                 Text(
                   _generateLinkTitle(post.link!),
@@ -106,22 +144,19 @@ class LinkPost extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                
+
                 const SizedBox(height: 4),
-                
+
                 // Link Description (optional)
                 Text(
                   'Preview of link content would appear here. This is a placeholder for the actual link preview that would be fetched from the URL metadata.',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Link URL
                 GestureDetector(
                   onTap: () => _launchURL(post.link!),
@@ -160,15 +195,15 @@ class LinkPost extends StatelessWidget {
     // In a real app, this would be fetched from the link metadata
     return 'Title of the linked content';
   }
-  
+
   // Launch URL in browser
   Future<void> _launchURL(String urlString) async {
     try {
       final Uri url = Uri.parse(urlString);
-      
+
       // Try to launch URL
       final bool canLaunch = await canLaunchUrl(url);
-      
+
       if (canLaunch) {
         // Only attempt to launch if canLaunch returns true
         await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -178,7 +213,7 @@ class LinkPost extends StatelessWidget {
       }
     } catch (e) {
       // Handle platform exceptions (common in simulators)
-      if (e.toString().contains('PlatformException') && 
+      if (e.toString().contains('PlatformException') &&
           e.toString().contains('channel-error')) {
         _showError('Cannot open URLs in simulator environment');
       } else {
@@ -186,12 +221,12 @@ class LinkPost extends StatelessWidget {
       }
     }
   }
-  
+
   void _showError(String message) {
     if (_contextHolder.currentContext != null) {
-      ScaffoldMessenger.of(_getContext()).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        _getContext(),
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 }

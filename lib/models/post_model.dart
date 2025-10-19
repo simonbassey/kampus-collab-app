@@ -1,6 +1,15 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
 enum PostType { text, image, link }
+
+// Content type from API
+enum ContentType { Text, Image, Video, Link }
+
+// Post audience type from API
+enum PostAudience { Public, Private, Friends }
+
+// Post type from API
+enum ApiPostType { Original, Repost, Comment }
 
 class PostModel {
   final String id;
@@ -38,6 +47,116 @@ class PostModel {
     required this.type,
     this.link,
   });
+
+  // Convert API JSON response to PostModel - using simplified structure
+  // We'll have to fill in missing fields with mock data for UI display
+  factory PostModel.fromJson(Map<String, dynamic> json) {
+    // Convert API content type to our app's PostType
+    PostType getPostType(String? contentType) {
+      switch (contentType) {
+        case 'Image':
+        case 'Video':
+          return PostType.image;
+        case 'Link':
+          return PostType.link;
+        case 'Text':
+        default:
+          return PostType.text;
+      }
+    }
+
+    // Handle the case where media URLs could be a string, JSON string, or a list
+    List<String> parseMediaUrls(dynamic mediaUrls) {
+      if (mediaUrls == null) return [];
+
+      if (mediaUrls is String) {
+        // Check if it's a JSON-encoded array string
+        if (mediaUrls.trim().startsWith('[')) {
+          try {
+            // Parse JSON string to list
+            final dynamic decoded = jsonDecode(mediaUrls);
+            if (decoded is List) {
+              return decoded.map((url) => url.toString()).toList();
+            }
+          } catch (e) {
+            print('Error parsing mediaUrls JSON: $e');
+          }
+        }
+        // Single URL string
+        return mediaUrls.isNotEmpty ? [mediaUrls] : [];
+      } else if (mediaUrls is List) {
+        return mediaUrls.map((url) => url.toString()).toList();
+      }
+
+      return [];
+    }
+
+    // Generate a random ID if not present
+    String id =
+        json['id']?.toString() ??
+        DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Map API field names to our model field names
+    String userId =
+        json['creatorId']?.toString() ?? json['userId']?.toString() ?? 'user1';
+    String userName = json['creatorName'] ?? json['userName'] ?? 'Campus User';
+    String? userAvatar = json['creatorAvatar'] ?? json['userAvatar'];
+
+    // Generate user handle from name or email if not provided
+    String userHandle =
+        json['userHandle'] ?? '@${userName.toLowerCase().replaceAll(' ', '')}';
+
+    // Extract reaction/engagement counts
+    int likes = json['reactionCount'] ?? json['likesCount'] ?? 0;
+    int comments = json['commentCount'] ?? json['commentsCount'] ?? 0;
+    int shares = json['repostCount'] ?? json['sharesCount'] ?? 0;
+
+    return PostModel(
+      // Use available fields from API
+      id: id,
+      userId: userId,
+      userName: userName,
+      // Use empty string as fallback instead of generating URL - UI will show icon
+      userAvatar: userAvatar ?? '',
+      userHandle: userHandle,
+      userRole: json['userRole'] ?? 'Student',
+      universityLogo: json['universityLogo'],
+      content: json['content'] ?? '',
+      images: parseMediaUrls(json['mediaUrls']),
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'])
+              : DateTime.now(),
+      likes: likes,
+      comments: comments,
+      shares: shares,
+      type: getPostType(json['contentType']),
+      link: json['link'],
+    );
+  }
+
+  // Convert to JSON for API requests - simplified structure as per requirements
+  Map<String, dynamic> toJson() {
+    String getContentType() {
+      switch (type) {
+        case PostType.image:
+          return images.isNotEmpty ? 'Image' : 'Text';
+        case PostType.link:
+          return 'Link';
+        case PostType.text:
+          return 'Text';
+      }
+    }
+
+    return {
+      'content': content,
+      'contentType': getContentType(),
+      'mediaUrls': images,
+      'audience': 'Public',
+      'parentId': 0, // Default to 0 for non-replies
+      'postType': 'Original',
+    };
+  }
 
   // Create a mock post for testing
   factory PostModel.mockText() {

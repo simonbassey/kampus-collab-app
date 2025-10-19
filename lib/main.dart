@@ -3,8 +3,20 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'routes/app_pages.dart';
 import 'bindings/app_binding.dart';
+import 'services/supabase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase
+  try {
+    await SupabaseService.initialize();
+    print('Main: Supabase initialized successfully');
+  } catch (e) {
+    print('Main: Supabase initialization error: $e');
+    print('Main: Continuing without Supabase - image uploads will not work');
+  }
+
   runApp(const MyApp());
 }
 
@@ -37,7 +49,7 @@ class MyApp extends StatelessWidget {
             fontSize: 36,
             fontWeight: FontWeight.w700, // Bold
           ),
-          
+
           // Headline styles - Medium (Monda)
           headlineLarge: TextStyle(
             fontFamily: 'Monda',
@@ -54,7 +66,7 @@ class MyApp extends StatelessWidget {
             fontSize: 24,
             fontWeight: FontWeight.w700, // Bold
           ),
-          
+
           // Title styles - Small (Monda)
           titleLarge: TextStyle(
             fontFamily: 'Monda',
@@ -73,7 +85,7 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.w500, // Medium (Regular)
             letterSpacing: 0.1,
           ),
-          
+
           // Body styles - Regular
           bodyLarge: TextStyle(
             fontSize: 16,
@@ -90,7 +102,7 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.w400, // Light
             letterSpacing: 0.4,
           ),
-          
+
           // Label styles - All caps (Monda)
           labelLarge: TextStyle(
             fontFamily: 'Monda',

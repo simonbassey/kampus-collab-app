@@ -10,7 +10,8 @@ class SplashScreen extends StatefulWidget {
   SplashScreenState createState() => SplashScreenState();
 }
 
-class SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -49,14 +50,13 @@ class SplashScreenState extends State<SplashScreen> with SingleTickerProviderSta
   void _checkAuthAndNavigate() async {
     final AuthController authController = Get.find<AuthController>();
     await authController.checkAuthStatus();
-    
+
     if (authController.isAuthenticated.value) {
       // User is authenticated, go to feed screen
       Get.offAllNamed('/feed');
     } else {
       // User is not authenticated, go to first/onboarding screen
-      // Get.offAllNamed('/first');
-       Get.offAllNamed('/feed');
+      Get.offAllNamed('/first');
     }
   }
 
@@ -79,7 +79,6 @@ class SplashScreenState extends State<SplashScreen> with SingleTickerProviderSta
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // You can replace this with your app logo
-               
                 const SizedBox(height: 24),
                 Text(
                   'INKSTRYQ',
@@ -97,7 +96,9 @@ class SplashScreenState extends State<SplashScreen> with SingleTickerProviderSta
                   style: TextStyle(
                     fontSize: 16,
                     fontFamily: GoogleFonts.inter().fontFamily,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ),
               ],

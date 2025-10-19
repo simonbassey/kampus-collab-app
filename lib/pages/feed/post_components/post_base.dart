@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
+import 'package:get/get.dart';
 import '../../../models/post_model.dart';
+import '../../../controllers/post_controller.dart';
+import '../../../widgets/rich_text_content.dart';
+import '../../../widgets/url_link_preview.dart';
+import '../../../widgets/safe_network_image.dart';
 import 'post_detail_screen.dart';
-import '../../../pages/profile/user_profile_screen.dart';
+import '../../../pages/profile/view_profile_page.dart';
 
 class PostBase extends StatefulWidget {
   final PostModel post;
@@ -23,11 +27,15 @@ class PostBase extends StatefulWidget {
 
 class _PostBaseState extends State<PostBase> {
   late PostModel post;
+  late PostController _postController;
+  String? _detectedUrl;
 
   @override
   void initState() {
     super.initState();
     post = widget.post;
+    // Get the post controller
+    _postController = Get.find<PostController>();
   }
 
   @override
@@ -55,11 +63,26 @@ class _PostBaseState extends State<PostBase> {
               child: Column(
                 children: [
                   Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        post.content,
-                        style: const TextStyle(fontSize: 14.0),
+                      RichTextContent(
+                        content: post.content,
+                        style: const TextStyle(
+                          fontSize: 14.0,
+                          color: Colors.black87,
+                          height: 1.4,
+                        ),
+                        onUrlDetected: (url) {
+                          if (_detectedUrl != url) {
+                            setState(() {
+                              _detectedUrl = url;
+                            });
+                          }
+                        },
                       ),
+                      // Show URL preview if URL is detected
+                      if (_detectedUrl != null)
+                        UrlLinkPreview(url: _detectedUrl!),
                       if (widget.contentWidget != null) ...[
                         const SizedBox(height: 12.0),
                         widget.contentWidget!,
@@ -82,9 +105,16 @@ class _PostBaseState extends State<PostBase> {
       children: [
         GestureDetector(
           onTap: () => _navigateToUserProfile(),
-          child: CircleAvatar(
+          child: SafeNetworkAvatar(
+            imageUrl:
+                post.userAvatar.isNotEmpty && post.userAvatar.startsWith('http')
+                    ? post.userAvatar
+                    : null,
             radius: 20.0,
-            backgroundImage: NetworkImage(post.userAvatar),
+            backgroundColor: const Color(0xFFEEF5FF),
+            fallbackIcon: Icons.person,
+            fallbackIconColor: const Color(0xFF5796FF),
+            fallbackIconSize: 24,
           ),
         ),
         const SizedBox(width: 12.0),
@@ -96,27 +126,33 @@ class _PostBaseState extends State<PostBase> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      post.userName,
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
-                        fontStyle: FontStyle.normal,
-                        fontSize: 16.0,
-                        letterSpacing: 0.0,
-                        color: Color(0xff333333),
+                    Flexible(
+                      child: Text(
+                        post.userName,
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 16.0,
+                          letterSpacing: 0.0,
+                          color: Color(0xff333333),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8.0),
-                    Text(
-                      post.userHandle,
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
-                        fontStyle: FontStyle.normal,
-                        fontSize: 12.0,
-                        letterSpacing: 0.0,
-                        color: Color(0xff333333),
+                    Flexible(
+                      child: Text(
+                        post.userHandle,
+                        style: TextStyle(
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 12.0,
+                          letterSpacing: 0.0,
+                          color: Color(0xff333333),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -202,7 +238,8 @@ class _PostBaseState extends State<PostBase> {
     );
   }
 
-  void _handleLike() {
+  void _handleLike() async {
+    // Optimistic update for responsive UI
     setState(() {
       if (post.isLiked) {
         post.likes--;
@@ -212,13 +249,44 @@ class _PostBaseState extends State<PostBase> {
         post.isLiked = true;
       }
     });
+
+    try {
+      // Call API in the background
+      bool success;
+      if (post.isLiked) {
+        success = await _postController.likePost(post.id);
+      } else {
+        success = await _postController.unlikePost(post.id);
+      }
+
+      // If API call failed, revert the optimistic update
+      if (!success) {
+        setState(() {
+          if (post.isLiked) {
+            post.likes--;
+            post.isLiked = false;
+          } else {
+            post.likes++;
+            post.isLiked = true;
+          }
+        });
+
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update like status')),
+        );
+      }
+    } catch (e) {
+      print('Error handling like: $e');
+    }
   }
 
   void _handleComment() {
-    // Navigate to comments view
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Comments feature coming soon!')),
-    );
+    // Navigate to post details screen where comments can be made
+    // Set focusCommentInput to true to trigger keyboard automatically
+    if (!widget.isInDetailScreen) {
+      PostDetailScreen.show(context, post, focusCommentInput: true);
+    }
   }
 
   void _handleShare() {
@@ -231,21 +299,55 @@ class _PostBaseState extends State<PostBase> {
     ).showSnackBar(const SnackBar(content: Text('Post shared!')));
   }
 
-  void _handleBookmark() {
+  // Bookmark functionality - not currently used in UI
+  // ignore: unused_element
+  void _handleBookmark() async {
+    // Optimistic update for responsive UI
+    final wasBookmarked = post.isBookmarked;
     setState(() {
-      post.isBookmarked = !post.isBookmarked;
+      post.isBookmarked = !wasBookmarked;
     });
 
+    // Show feedback to user
     if (post.isBookmarked) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Post saved to bookmarks')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post removed from bookmarks')),
+      );
+    }
+
+    try {
+      // Call API in the background
+      bool success;
+      if (post.isBookmarked) {
+        success = await _postController.bookmarkPost(post.id);
+      } else {
+        success = await _postController.unbookmarkPost(post.id);
+      }
+
+      // If API call failed, revert the optimistic update
+      if (!success) {
+        setState(() {
+          post.isBookmarked = wasBookmarked;
+        });
+
+        // Show error message
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update bookmark status')),
+        );
+      }
+    } catch (e) {
+      print('Error handling bookmark: $e');
     }
   }
 
   void _navigateToUserProfile() {
     // Navigate to the user profile screen
-    UserProfileScreen.showProfile(context, post);
+    ViewProfilePage.showProfile(context, post);
   }
 
   void _showPostOptions() {

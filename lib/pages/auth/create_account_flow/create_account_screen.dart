@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../controllers/auth_controller.dart';
+import '../../../utils/error_message_helper.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -16,20 +17,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _passwordVisible = false;
   bool _hasMinLength = false;
   bool _hasUpperAndLowerCase = false;
   bool _hasNumberOrSpecialChar = false;
   bool _notContainsEmail = true;
   bool _notCommonlyUsed = true;
-  
+
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(_validatePassword);
   }
-  
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -37,33 +38,42 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     _passwordController.dispose();
     super.dispose();
   }
-  
+
   void _validatePassword() {
     final password = _passwordController.text;
     final email = _emailController.text.toLowerCase();
-    
+
     setState(() {
       // Check for minimum length
       _hasMinLength = password.length >= 8;
-      
+
       // Check for uppercase and lowercase letters
-      _hasUpperAndLowerCase = password.contains(RegExp(r'[a-z]')) && 
-                              password.contains(RegExp(r'[A-Z]'));
-      
+      _hasUpperAndLowerCase =
+          password.contains(RegExp(r'[a-z]')) &&
+          password.contains(RegExp(r'[A-Z]'));
+
       // Check for at least one number or special character
-      _hasNumberOrSpecialChar = password.contains(RegExp(r'[0-9]')) || 
-                               password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'));
-      
+      _hasNumberOrSpecialChar =
+          password.contains(RegExp(r'[0-9]')) ||
+          password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'));
+
       // Check if password contains email
-      _notContainsEmail = email.isEmpty || 
-                         !password.toLowerCase().contains(email.split('@')[0].toLowerCase());
-      
+      _notContainsEmail =
+          email.isEmpty ||
+          !password.toLowerCase().contains(email.split('@')[0].toLowerCase());
+
       // This would normally check against a database of common passwords
       // For now, we'll just check if it's not too simple
-      _notCommonlyUsed = !['password', '123456', 'qwerty', 'admin'].contains(password.toLowerCase());
+      _notCommonlyUsed =
+          ![
+            'password',
+            '123456',
+            'qwerty',
+            'admin',
+          ].contains(password.toLowerCase());
     });
   }
-  
+
   void _signUp() async {
     if (_formKey.currentState!.validate() &&
         _hasMinLength &&
@@ -71,22 +81,29 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         _hasNumberOrSpecialChar &&
         _notContainsEmail &&
         _notCommonlyUsed) {
-      
       // Call the auth controller to initiate signup
       final success = await _authController.initiateSignup(
         _nameController.text,
         _emailController.text,
-        _passwordController.text
+        _passwordController.text,
       );
-      
+
       if (success) {
         // Navigate to account creation OTP verification
-        Get.toNamed('/create-account-otp', arguments: {'email': _emailController.text});
+        Get.toNamed(
+          '/create-account-otp',
+          arguments: {'email': _emailController.text},
+        );
       } else {
+        // Clean error message before showing to user
+        String cleanError = ErrorMessageHelper.getUserFriendlyMessage(
+          _authController.errorMessage.value,
+        );
+
         // Show error message
         Get.snackbar(
           'Error',
-          _authController.errorMessage.value,
+          cleanError,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],
@@ -95,12 +112,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       }
     }
   }
-  
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -113,7 +129,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
-                  
+
                   // Logo
                   Center(
                     child: Text(
@@ -126,9 +142,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Create Account Title
                   Text(
                     'Create Account',
@@ -138,9 +154,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       color: const Color(0xFF333333),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Sign up with Email text
                   Text(
                     'Sign up with Email',
@@ -150,9 +166,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       fontFamily: GoogleFonts.inter().fontFamily,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Already have an account
                   Row(
                     children: [
@@ -178,9 +194,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Full Name Field
                   Text(
                     'Full name',
@@ -195,12 +211,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      hintText: 'Enter your full name',
+                      hintText: 'Enter your first and last name',
                       hintStyle: TextStyle(
                         color: Colors.grey[400],
                         fontFamily: GoogleFonts.inter().fontFamily,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
@@ -216,14 +235,19 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your name';
+                        return 'Please enter your full name';
+                      }
+                      // Check if name has at least 2 parts (first and last name)
+                      final nameParts = value.trim().split(' ');
+                      if (nameParts.length < 2) {
+                        return 'Please enter both first and last name';
                       }
                       return null;
                     },
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Email Field
                   Text(
                     'Email Address',
@@ -244,7 +268,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         color: Colors.grey[400],
                         fontFamily: GoogleFonts.inter().fontFamily,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
@@ -261,16 +288,18 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
-                      } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      } else if (!RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      ).hasMatch(value)) {
                         return 'Please enter a valid email';
                       }
                       return null;
                     },
                     onChanged: (_) => _validatePassword(),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Password Field
                   Text(
                     'Password',
@@ -291,7 +320,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         color: Colors.grey[400],
                         fontFamily: GoogleFonts.inter().fontFamily,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
@@ -306,7 +338,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _passwordVisible ? Icons.visibility : Icons.visibility_off,
+                          _passwordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                           color: Colors.grey,
                         ),
                         onPressed: () {
@@ -323,9 +357,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       return null;
                     },
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Password Requirements
                   Text(
                     'Create a password that:',
@@ -336,9 +370,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       fontFamily: GoogleFonts.inter().fontFamily,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Password Requirements List
                   PasswordRequirement(
                     text: 'Contains at least 8 characters',
@@ -360,40 +394,46 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     text: 'Is not commonly used',
                     isMet: _notCommonlyUsed,
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Sign Up Button
-                  Obx(() => ElevatedButton(
-                    onPressed: _authController.isInitiatingSignup.value ? null : _signUp,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF5796FF),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    child: _authController.isInitiatingSignup.value
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            fontFamily: GoogleFonts.inter().fontFamily,
-                          ),
+                  Obx(
+                    () => ElevatedButton(
+                      onPressed:
+                          _authController.isInitiatingSignup.value
+                              ? null
+                              : _signUp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF5796FF),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
                         ),
-                  )),
-                  
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
+                      child:
+                          _authController.isInitiatingSignup.value
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : Text(
+                                'Sign Up',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: GoogleFonts.inter().fontFamily,
+                                ),
+                              ),
+                    ),
+                  ),
+
                   const SizedBox(height: 24),
                 ],
               ),
@@ -408,7 +448,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 class PasswordRequirement extends StatelessWidget {
   final String text;
   final bool isMet;
-  
+
   const PasswordRequirement({
     super.key,
     required this.text,

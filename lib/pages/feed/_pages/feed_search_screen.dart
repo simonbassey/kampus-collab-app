@@ -30,6 +30,25 @@ class _FeedSearchScreenState extends State<FeedSearchScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Check if there are arguments passed from navigation
+    Future.delayed(Duration.zero, () {
+      final args = Get.arguments;
+      if (args != null && args is Map) {
+        final searchQuery = args['searchQuery'] as String?;
+        final type = args['type'] as String?;
+        
+        if (searchQuery != null && searchQuery.isNotEmpty) {
+          // Populate search bar with the query
+          final prefix = type == 'hashtag' ? '#' : type == 'mention' ? '@' : '';
+          _searchController.text = '$prefix$searchQuery';
+          
+          // Perform search immediately
+          _performSearch(_searchController.text);
+        }
+      }
+    });
+    
     // Focus on search field when screen opens
     Future.delayed(const Duration(milliseconds: 300), () {
       _searchFocus.requestFocus();

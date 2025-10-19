@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/post_model.dart';
-import '../../../pages/profile/user_profile_screen.dart';
+import '../../../pages/profile/view_profile_page.dart';
 
 class CommentModel {
   final String id;
@@ -30,7 +30,7 @@ class CommentModel {
   String get timeAgo {
     final now = DateTime.now();
     final difference = now.difference(createdAt);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d';
     } else if (difference.inHours > 0) {
@@ -55,7 +55,8 @@ class CommentModel {
       userAvatar: 'https://randomuser.me/api/portraits/men/$id.jpg',
       userHandle: '@user$id',
       content: content,
-      createdAt: createdAt ?? DateTime.now().subtract(Duration(hours: int.parse(id))),
+      createdAt:
+          createdAt ?? DateTime.now().subtract(Duration(hours: int.parse(id))),
       likes: int.parse(id),
     );
   }
@@ -99,10 +100,10 @@ class _CommentItemState extends State<CommentItem> {
       createdAt: comment.createdAt,
       type: PostType.text,
     );
-    
-    UserProfileScreen.showProfile(context, mockPost);
+
+    ViewProfilePage.showProfile(context, mockPost);
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -117,7 +118,21 @@ class _CommentItemState extends State<CommentItem> {
                 onTap: () => _navigateToUserProfile(context),
                 child: CircleAvatar(
                   radius: 16.0,
-                  backgroundImage: NetworkImage(comment.userAvatar),
+                  backgroundColor: Color(0xFFEEF5FF),
+                  backgroundImage:
+                      comment.userAvatar.isNotEmpty &&
+                              comment.userAvatar.startsWith('http')
+                          ? NetworkImage(comment.userAvatar)
+                          : null,
+                  child:
+                      comment.userAvatar.isNotEmpty &&
+                              comment.userAvatar.startsWith('http')
+                          ? null
+                          : Icon(
+                            Icons.person,
+                            size: 20,
+                            color: Color(0xFF5796FF),
+                          ),
                 ),
               ),
               const SizedBox(width: 12.0),
@@ -168,15 +183,23 @@ class _CommentItemState extends State<CommentItem> {
                           child: Row(
                             children: [
                               Icon(
-                                comment.isLiked ? Icons.favorite : Icons.favorite_border,
+                                comment.isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
                                 size: 16.0,
-                                color: comment.isLiked ? Colors.red : Colors.grey[600],
+                                color:
+                                    comment.isLiked
+                                        ? Colors.red
+                                        : Colors.grey[600],
                               ),
                               const SizedBox(width: 4.0),
                               Text(
                                 comment.likes.toString(),
                                 style: TextStyle(
-                                  color: comment.isLiked ? Colors.red : Colors.grey[600],
+                                  color:
+                                      comment.isLiked
+                                          ? Colors.red
+                                          : Colors.grey[600],
                                   fontSize: 12.0,
                                 ),
                               ),
@@ -211,13 +234,14 @@ class _CommentItemState extends State<CommentItem> {
             Padding(
               padding: const EdgeInsets.only(left: 28.0),
               child: Column(
-                children: comment.replies.map((reply) {
-                  return CommentItem(
-                    comment: reply,
-                    onReply: widget.onReply,
-                    showReplies: false, // Prevent deep nesting
-                  );
-                }).toList(),
+                children:
+                    comment.replies.map((reply) {
+                      return CommentItem(
+                        comment: reply,
+                        onReply: widget.onReply,
+                        showReplies: false, // Prevent deep nesting
+                      );
+                    }).toList(),
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../controllers/auth_controller.dart';
 import '../auth/signup_screen.dart';
 import '../auth/create_account_flow/create_account_otp_screen.dart';
+import '../../utils/error_message_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,10 +45,15 @@ class _LoginScreenState extends State<LoginScreen> {
           arguments: {'email': result['email']},
         );
       } else {
+        // Clean error message before showing to user
+        String cleanError = ErrorMessageHelper.getUserFriendlyMessage(
+          _authController.errorMessage.value,
+        );
+
         // Show error message
         Get.snackbar(
           'Error',
-          _authController.errorMessage.value,
+          cleanError,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red[100],
           colorText: Colors.red[900],

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get.dart';
+import '../pages/post/create_post_page.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -71,38 +73,48 @@ class CustomBottomNavBar extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Center floating action button - elevated with higher z-index
+                // Center floating action button with improved tap area
                 Positioned(
                   top: -45,
-                  child: Material(
-                    elevation: 8, // Adds material elevation for proper z-index
-                    color:
-                        Colors
-                            .transparent, // Makes the material background transparent
-                    shadowColor: const Color(
-                      0x40000000,
-                    ), // Shadow color matching the button
-                    shape: const CircleBorder(), // Keeps the circular shape
-                    child: GestureDetector(
-                      onTap: () => onTap(2),
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4A90E2),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.add_rounded,
-                          color: Colors.white,
-                          size: 30,
+                  child: GestureDetector(
+                    // This ensures the entire area is tappable
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      // Open the create post page
+                      Get.to(() => const CreatePostPage());
+                    },
+                    // Create a larger invisible tap area
+                    child: Container(
+                      width:
+                          80, // Larger than the visible button for better tapping
+                      height:
+                          80, // Larger than the visible button for better tapping
+                      color: Colors.transparent, // Invisible container
+                      alignment: Alignment.center,
+                      child: Material(
+                        elevation: 8,
+                        color: Colors.transparent,
+                        shadowColor: const Color(0x40000000),
+                        shape: const CircleBorder(),
+                        child: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A90E2),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.25),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                         ),
                       ),
                     ),
@@ -111,7 +123,7 @@ class CustomBottomNavBar extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
         ],
       ),
     );
