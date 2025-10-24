@@ -1,28 +1,33 @@
 import 'package:flutter/material.dart';
 import '../../../models/post_model.dart';
-import 'post_base.dart';
 import 'text_post.dart';
 import 'image_post.dart';
 import 'link_post.dart';
 import 'comment_item.dart';
-import 'image_viewer.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
   final bool focusCommentInput;
 
   const PostDetailScreen({
-    Key? key, 
+    Key? key,
     required this.post,
     this.focusCommentInput = false,
   }) : super(key: key);
 
-  static void show(BuildContext context, PostModel post, {bool focusCommentInput = false}) {
+  static void show(
+    BuildContext context,
+    PostModel post, {
+    bool focusCommentInput = false,
+  }) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => PostDetailScreen(
-        post: post,
-        focusCommentInput: focusCommentInput,
-      )),
+      MaterialPageRoute(
+        builder:
+            (context) => PostDetailScreen(
+              post: post,
+              focusCommentInput: focusCommentInput,
+            ),
+      ),
     );
   }
 
@@ -43,7 +48,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.initState();
     post = widget.post;
     _loadComments();
-    
+
     // Focus on comment input if requested (after small delay for animation)
     if (widget.focusCommentInput) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -146,11 +151,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           contextOverride: context, // Pass the context for image viewer
           isInDetailScreen: true, // Flag to prevent navigation loop
         );
-      default:
-        return TextPost(
-          post: post,
-          isInDetailScreen: true, // Flag to prevent navigation loop
-        );
     }
   }
 
@@ -251,11 +251,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 16.0,
-            backgroundImage: NetworkImage(
-              'https://randomuser.me/api/portraits/men/1.jpg',
-            ),
+            backgroundColor: const Color(0xFFEEF5FF),
+            child: Icon(Icons.person, size: 20, color: const Color(0xFF5796FF)),
           ),
           const SizedBox(width: 12.0),
           Expanded(

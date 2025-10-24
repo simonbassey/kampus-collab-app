@@ -332,6 +332,8 @@ class StudentProfileController extends GetxController {
     String? academicEmail,
     File? profileImageFile,
     File? idCardFile,
+    String? profileImageUrl, // New: Supabase URL for profile photo
+    String? idCardUrl, // New: Supabase URL for ID card
   }) async {
     if (!_authController.isAuthenticated.value) {
       error.value = 'User not authenticated';
@@ -352,8 +354,13 @@ class StudentProfileController extends GetxController {
         profileData['identityNumber'] = identityNumber;
       if (academicEmail != null) profileData['academicEmail'] = academicEmail;
 
-      // Handle profile image if provided
-      if (profileImageFile != null) {
+      // Handle profile image - prioritize URL over File
+      if (profileImageUrl != null) {
+        // Use Supabase URL directly
+        profileData['profilePhotoUrl'] = profileImageUrl;
+        print('Using Supabase profile photo URL: $profileImageUrl');
+      } else if (profileImageFile != null) {
+        // Fallback to base64 encoding (legacy support)
         try {
           print('Encoding profile image for update with new API...');
           final bytes = await profileImageFile.readAsBytes();
@@ -364,10 +371,7 @@ class StudentProfileController extends GetxController {
             print(
               'Warning: Profile image is too large (${base64Image.length} chars). Maximum is 4000. Skipping image upload.',
             );
-            // Don't set error value here - we'll still try to update other fields
-            // Just log the warning
           } else {
-            // The API expects 'profilePhotoUrl' field for the base64 encoded image
             profileData['profilePhotoUrl'] = base64Image;
             print(
               'Profile image encoded successfully (${base64Image.length} chars)',
@@ -378,8 +382,13 @@ class StudentProfileController extends GetxController {
         }
       }
 
-      // Handle ID card image if provided
-      if (idCardFile != null) {
+      // Handle ID card - prioritize URL over File
+      if (idCardUrl != null) {
+        // Use Supabase URL directly
+        profileData['identityCardUrl'] = idCardUrl;
+        print('Using Supabase ID card URL: $idCardUrl');
+      } else if (idCardFile != null) {
+        // Fallback to base64 encoding (legacy support)
         try {
           print('Encoding ID card image for update with new API...');
           final bytes = await idCardFile.readAsBytes();
@@ -390,8 +399,6 @@ class StudentProfileController extends GetxController {
             print(
               'Warning: ID card image is too large (${base64IdCard.length} chars). Maximum is 4000. Skipping ID card upload.',
             );
-            // Don't set error value here - we'll still try to update other fields
-            // Just log the warning
           } else {
             profileData['identityCardBase64'] = base64IdCard;
             print(

@@ -63,8 +63,6 @@ class PostList extends StatelessWidget {
         return ImagePost(post: post);
       case PostType.link:
         return LinkPost(post: post);
-      default:
-        return TextPost(post: post);
     }
   }
 }

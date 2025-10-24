@@ -8,6 +8,12 @@ import '../../../controllers/student_profile_controller.dart';
 class FeedAppBar extends StatelessWidget {
   const FeedAppBar({Key? key}) : super(key: key);
 
+  // Helper to check if string is a URL
+  bool _isUrl(String? str) {
+    if (str == null) return false;
+    return str.startsWith('http://') || str.startsWith('https://');
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get access to the student profile controller
@@ -54,18 +60,29 @@ class FeedAppBar extends StatelessWidget {
                         ImageProvider? profileImageProvider;
                         if (hasValidProfilePicture) {
                           try {
-                            final String base64String =
+                            final String photoUrl =
                                 profileController
                                     .studentProfile
                                     .value!
                                     .profilePhotoUrl!;
-                            final Uint8List imageBytes = base64Decode(
-                              base64String,
-                            );
-                            profileImageProvider = MemoryImage(imageBytes);
+
+                            // Check if it's a URL or base64
+                            if (_isUrl(photoUrl)) {
+                              profileImageProvider = NetworkImage(photoUrl);
+                            } else {
+                              // Remove any data URI prefix if present
+                              String sanitizedBase64 = photoUrl;
+                              if (photoUrl.contains(',')) {
+                                sanitizedBase64 = photoUrl.split(',')[1];
+                              }
+                              final Uint8List imageBytes = base64Decode(
+                                sanitizedBase64,
+                              );
+                              profileImageProvider = MemoryImage(imageBytes);
+                            }
                           } catch (e) {
                             // If decoding fails, we'll show the fallback icon
-                            print('Error decoding profile image: $e');
+                            print('Error loading profile image: $e');
                           }
                         }
 

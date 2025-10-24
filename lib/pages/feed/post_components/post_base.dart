@@ -107,7 +107,9 @@ class _PostBaseState extends State<PostBase> {
           onTap: () => _navigateToUserProfile(),
           child: SafeNetworkAvatar(
             imageUrl:
-                post.userAvatar.isNotEmpty && post.userAvatar.startsWith('http')
+                post.userAvatar.isNotEmpty &&
+                        (post.userAvatar.startsWith('http') ||
+                            post.userAvatar.startsWith('https'))
                     ? post.userAvatar
                     : null,
             radius: 20.0,

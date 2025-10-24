@@ -10,6 +10,8 @@ class PostCreationToolbar extends StatelessWidget {
   final VoidCallback onMentionPressed;
   final VoidCallback onImagePressed;
   final VoidCallback onAddPressed;
+  final VoidCallback? onThreadPressed; // New callback for thread creation
+  final int threadCount; // Number of threads currently present
 
   const PostCreationToolbar({
     Key? key,
@@ -18,6 +20,8 @@ class PostCreationToolbar extends StatelessWidget {
     required this.onMentionPressed,
     required this.onImagePressed,
     required this.onAddPressed,
+    this.onThreadPressed,
+    this.threadCount = 0,
   }) : super(key: key);
 
   void _showCreateTypeSelector(BuildContext context) {
@@ -158,10 +162,48 @@ class PostCreationToolbar extends StatelessWidget {
             icon: const Icon(Icons.image, color: Color(0xff5796FF)),
             onPressed: onImagePressed,
           ),
-          IconButton(
-            icon: const Icon(Icons.add_circle, color: Color(0xff5796FF)),
-            onPressed: onAddPressed,
-          ),
+          // Thread button with count (only show if onThreadPressed is provided)
+          if (onThreadPressed != null)
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Color(0xff5796FF)),
+                  onPressed: onThreadPressed,
+                  tooltip: 'Add thread post',
+                ),
+                if (threadCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '$threadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Color(0xff5796FF)),
+              onPressed: onAddPressed,
+              tooltip: 'Add',
+            ),
         ],
       ),
     );

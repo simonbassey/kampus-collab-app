@@ -14,6 +14,19 @@ import '../../models/student_profile_model.dart';
 import '../../widgets/post_creation_toolbar.dart';
 import '../../utils/error_message_helper.dart';
 
+// Thread post model
+class ThreadPost {
+  final String id;
+  final TextEditingController textController;
+  final List<File> images;
+
+  ThreadPost({
+    required this.id,
+    required this.textController,
+    this.images = const [],
+  });
+}
+
 class CreatePostPage extends StatefulWidget {
   const CreatePostPage({Key? key}) : super(key: key);
 
@@ -30,8 +43,13 @@ class _CreatePostPageState extends State<CreatePostPage> {
   final ImagePicker _imagePicker = ImagePicker();
   String _visibility = 'Everyone';
   bool _isPosting = false;
+  bool _isAddingImage = false;
   List<File> _selectedImages = [];
   final int _maxImages = 4;
+
+  // Thread-related state
+  List<ThreadPost> _threadPosts = [];
+  bool _isThreadMode = false;
 
   @override
   void initState() {
@@ -40,11 +58,17 @@ class _CreatePostPageState extends State<CreatePostPage> {
     if (_profileController.studentProfile.value == null) {
       _profileController.fetchCurrentUserProfile();
     }
+
+    // Initialize with empty thread posts list - will be populated when needed
   }
 
   @override
   void dispose() {
     _postController.dispose();
+    // Dispose thread post controllers
+    for (var threadPost in _threadPosts) {
+      threadPost.textController.dispose();
+    }
     super.dispose();
   }
 
@@ -435,14 +459,14 @@ class _CreatePostPageState extends State<CreatePostPage> {
                             radius: 20,
                             backgroundColor: const Color(
                               0xff5796FF,
-                            ).withOpacity(0.2),
+                            ).withValues(alpha: 0.2),
                             child:
                                 user['photo'] == null
                                     ? Icon(
                                       Icons.person,
                                       color: const Color(
                                         0xff5796FF,
-                                      ).withOpacity(0.7),
+                                      ).withValues(alpha: 0.7),
                                     )
                                     : null,
                           ),
@@ -551,10 +575,30 @@ class _CreatePostPageState extends State<CreatePostPage> {
 
   // Get image from source
   Future<void> _getImage(ImageSource source) async {
-    final pickedFile = await _imagePicker.pickImage(source: source);
-    if (pickedFile != null) {
+    setState(() {
+      _isAddingImage = true;
+    });
+
+    try {
+      final pickedFile = await _imagePicker.pickImage(source: source);
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImages.add(File(pickedFile.path));
+        });
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to add image. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } finally {
       setState(() {
-        _selectedImages.add(File(pickedFile.path));
+        _isAddingImage = false;
       });
     }
   }
@@ -564,6 +608,634 @@ class _CreatePostPageState extends State<CreatePostPage> {
     setState(() {
       _selectedImages.removeAt(index);
     });
+  }
+
+  // Build thread post UI
+  Widget _buildThreadPost(int index) {
+    final threadPost = _threadPosts[index];
+    final isFirst = index == 0;
+    final isLast = index == _threadPosts.length - 1;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Vertical line and avatar
+            Column(
+              children: [
+                // Avatar
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to profile page when avatar is clicked
+                    Get.to(() => const ProfilePage());
+                  },
+                  child: Obx(() {
+                    final profile = _profileController.studentProfile.value;
+                    _logProfileImageUrl(profile?.profilePhotoUrl);
+                    return CircleAvatar(
+                      backgroundImage:
+                          profile?.profilePhotoUrl != null
+                              ? _isUrl(profile!.profilePhotoUrl)
+                                  ? NetworkImage(profile.profilePhotoUrl!)
+                                      as ImageProvider
+                                  : MemoryImage(
+                                    _convertBase64ToImage(
+                                      profile.profilePhotoUrl!,
+                                    ),
+                                  )
+                              : null,
+                      onBackgroundImageError: (exception, stackTrace) {
+                        debugPrint(
+                          'Error loading profile image in thread post: $exception',
+                        );
+                        // Force rebuild to show fallback icon
+                        setState(() {});
+                      },
+                      backgroundColor: Color(0xff5796FF).withValues(alpha: 0.2),
+                      child:
+                          profile?.profilePhotoUrl == null
+                              ? Icon(
+                                Icons.person,
+                                color: Color(0xff5796FF).withValues(alpha: 0.7),
+                              )
+                              : null,
+                      radius: 20,
+                    );
+                  }),
+                ),
+                // Vertical line - only show if not the last post
+                if (!isLast)
+                  Expanded(
+                    child: Container(width: 2, color: Color(0xFFE5E7EB)),
+                  ),
+              ],
+            ),
+            SizedBox(width: 12),
+            // Content area
+            Expanded(
+              child: Stack(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // User info
+                      Obx(() {
+                        final profile = _profileController.studentProfile.value;
+                        return Row(
+                          children: [
+                            Text(
+                              profile?.fullName ?? 'Anonymous',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                                color: Color(0xff333333),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getUserHandle(profile),
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w400,
+                                fontSize: 12.0,
+                                color: Color(0xFF606060),
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                      SizedBox(height: 8),
+                      // Text input
+                      Container(
+                        constraints: BoxConstraints(
+                          minHeight: 80,
+                          maxHeight: MediaQuery.of(context).size.height * 0.3,
+                        ),
+                        child: TextField(
+                          controller: threadPost.textController,
+                          maxLength: 300,
+                          maxLines: null,
+                          minLines: 3,
+                          decoration: InputDecoration(
+                            hintText: "Continue your thought...",
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            counterText:
+                                '${threadPost.textController.text.length}/300',
+                            counterStyle: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  threadPost.textController.text.length > 300
+                                      ? Colors.red
+                                      : Color(0xFF9CA3AF),
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w400,
+                            fontSize: 16.0,
+                            color: Color(0xFF333333),
+                          ),
+                          onChanged: (text) {
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                      // Images preview
+                      if (threadPost.images.isNotEmpty || _isAddingImage)
+                        Container(
+                          margin: const EdgeInsets.only(top: 8.0),
+                          height: 100.0,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount:
+                                threadPost.images.length +
+                                (_isAddingImage ? 1 : 0),
+                            itemBuilder: (context, imgIndex) {
+                              // Show loading indicator as the last item when adding image
+                              if (_isAddingImage &&
+                                  imgIndex == threadPost.images.length) {
+                                return Container(
+                                  margin: const EdgeInsets.only(right: 8.0),
+                                  width: 100.0,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    color: const Color(0xFFF5F5F5),
+                                    border: Border.all(
+                                      color: const Color(0xFFE5E7EB),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Color(0xFF5796FF),
+                                                ),
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'Adding...',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Color(0xFF9CA3AF),
+                                            fontFamily: 'Inter',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              // Show actual images
+                              return Stack(
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 8.0),
+                                    width: 100.0,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      image: DecorationImage(
+                                        image: FileImage(
+                                          threadPost.images[imgIndex],
+                                        ),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 4,
+                                    right: 12,
+                                    child: GestureDetector(
+                                      onTap:
+                                          () => _removeThreadPostImage(
+                                            index,
+                                            imgIndex,
+                                          ),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          size: 16,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                  // Cancel icon - only show for non-first posts
+                  if (!isFirst)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: () => _removeThreadPost(index),
+                        child: Container(
+                          padding: EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.close, size: 16, color: Colors.red),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Pick images for specific thread post
+  Future<void> _pickImagesForThreadPost(int threadPostIndex) async {
+    final threadPost = _threadPosts[threadPostIndex];
+    if (threadPost.images.length >= _maxImages) {
+      Get.snackbar(
+        'Maximum Images',
+        'You can only select up to $_maxImages images per post',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Photo Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _getImageForThreadPost(ImageSource.gallery, threadPostIndex);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _getImageForThreadPost(ImageSource.camera, threadPostIndex);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Get image for specific thread post
+  Future<void> _getImageForThreadPost(
+    ImageSource source,
+    int threadPostIndex,
+  ) async {
+    setState(() {
+      _isAddingImage = true;
+    });
+
+    try {
+      final pickedFile = await _imagePicker.pickImage(source: source);
+      if (pickedFile != null) {
+        setState(() {
+          _threadPosts[threadPostIndex].images.add(File(pickedFile.path));
+        });
+      }
+    } catch (e) {
+      print('Error picking image for thread post: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to add image. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } finally {
+      setState(() {
+        _isAddingImage = false;
+      });
+    }
+  }
+
+  // Remove image from specific thread post
+  void _removeThreadPostImage(int threadPostIndex, int imageIndex) {
+    setState(() {
+      _threadPosts[threadPostIndex].images.removeAt(imageIndex);
+    });
+  }
+
+  // Build thread interface
+  Widget _buildThreadInterface() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Main post content (always visible)
+          _buildMainPostContent(),
+          // Thread posts
+          if (_threadPosts.isNotEmpty)
+            ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: _threadPosts.length,
+              itemBuilder: (context, index) {
+                return _buildThreadPost(index);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Build main post content
+  Widget _buildMainPostContent() {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar column with connector line
+            Column(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Get.to(() => const ProfilePage());
+                  },
+                  child: Obx(() {
+                    final profile = _profileController.studentProfile.value;
+                    _logProfileImageUrl(profile?.profilePhotoUrl);
+                    return CircleAvatar(
+                      backgroundImage:
+                          profile?.profilePhotoUrl != null
+                              ? _isUrl(profile!.profilePhotoUrl)
+                                  ? NetworkImage(profile.profilePhotoUrl!)
+                                      as ImageProvider
+                                  : MemoryImage(
+                                    _convertBase64ToImage(
+                                      profile.profilePhotoUrl!,
+                                    ),
+                                  )
+                              : null,
+                      onBackgroundImageError: (exception, stackTrace) {
+                        debugPrint(
+                          'Error loading profile image in main post: $exception',
+                        );
+                        setState(() {});
+                      },
+                      backgroundColor: Color(0xff5796FF).withValues(alpha: 0.2),
+                      child:
+                          profile?.profilePhotoUrl == null
+                              ? Icon(
+                                Icons.person,
+                                color: Color(0xff5796FF).withValues(alpha: 0.7),
+                              )
+                              : null,
+                      radius: 20,
+                    );
+                  }),
+                ),
+                // Vertical line - only show if there are thread posts
+                if (_threadPosts.isNotEmpty)
+                  Expanded(
+                    child: Container(width: 2, color: Color(0xFFE5E7EB)),
+                  ),
+              ],
+            ),
+            SizedBox(width: 12),
+            // Content area
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User info
+                  Obx(() {
+                    final profile = _profileController.studentProfile.value;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              profile?.fullName ?? 'Anonymous',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                                color: Color(0xff333333),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getUserHandle(profile),
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w400,
+                                fontSize: 12.0,
+                                color: Color(0xFF606060),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        // Visibility settings
+                        GestureDetector(
+                          onTap: () => _showAudienceSelector(context),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _getVisibilityIcon(_visibility),
+                              const SizedBox(width: 4),
+                              Text(
+                                _visibility,
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14.0,
+                                  color: Color(0xff333333),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.keyboard_arrow_down_outlined,
+                                color: Color(0xff333333),
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                      ],
+                    );
+                  }),
+                  // Text input
+                  Container(
+                    constraints: BoxConstraints(
+                      minHeight: 100,
+                      maxHeight: MediaQuery.of(context).size.height * 0.3,
+                    ),
+                    child: TextField(
+                      controller: _postController,
+                      maxLength: 300,
+                      maxLines: null,
+                      minLines: 4,
+                      decoration: InputDecoration(
+                        hintText: "What's happening in your school?",
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        counterText: '${_postController.text.length}/300',
+                        counterStyle: TextStyle(
+                          fontSize: 12,
+                          color:
+                              _postController.text.length > 300
+                                  ? Colors.red
+                                  : Color(0xFF9CA3AF),
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w400,
+                        fontSize: 16.0,
+                        color: Color(0xFF333333),
+                      ),
+                      onChanged: (text) {
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  // Images preview
+                  if (_selectedImages.isNotEmpty || _isAddingImage)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8.0),
+                      height: 100.0,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount:
+                            _selectedImages.length + (_isAddingImage ? 1 : 0),
+                        itemBuilder: (context, imgIndex) {
+                          // Show loading indicator as the last item when adding image
+                          if (_isAddingImage &&
+                              imgIndex == _selectedImages.length) {
+                            return Container(
+                              margin: const EdgeInsets.only(right: 8.0),
+                              width: 100.0,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8.0),
+                                color: const Color(0xFFF5F5F5),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF5796FF),
+                                            ),
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Adding...',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFF9CA3AF),
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+
+                          // Show actual images
+                          return Stack(
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(right: 8.0),
+                                width: 100.0,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8.0),
+                                  image: DecorationImage(
+                                    image: FileImage(_selectedImages[imgIndex]),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 12,
+                                child: GestureDetector(
+                                  onTap: () => _removeImage(imgIndex),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Build a custom rich text editor that only highlights hashtags and mentions
@@ -582,12 +1254,22 @@ class _CreatePostPageState extends State<CreatePostPage> {
             // Text field for post content
             TextField(
               controller: _postController,
+              maxLength: 300,
               maxLines: null, // Allow text to wrap
               minLines: 3, // At least show 3 lines
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: "What's happening in your school?",
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
+                counterText: '${_postController.text.length}/300',
+                counterStyle: TextStyle(
+                  fontSize: 12,
+                  color:
+                      _postController.text.length > 300
+                          ? Colors.red
+                          : Color(0xFF9CA3AF),
+                  fontFamily: 'Inter',
+                ),
               ),
               style: const TextStyle(
                 fontFamily: 'Poppins',
@@ -603,25 +1285,61 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 _processPostText(text);
                 setState(() {});
               },
-              buildCounter:
-                  (
-                    _, {
-                    required currentLength,
-                    maxLength,
-                    required isFocused,
-                  }) => null,
             ),
 
-            // Display selected images
-            if (_selectedImages.isNotEmpty)
+            // Display selected images and loading indicator
+            if (_selectedImages.isNotEmpty || _isAddingImage)
               Container(
                 margin: const EdgeInsets.only(top: 8.0, bottom: 8.0),
                 height: 100.0,
                 width: double.infinity,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _selectedImages.length,
+                  itemCount: _selectedImages.length + (_isAddingImage ? 1 : 0),
                   itemBuilder: (context, index) {
+                    // Show loading indicator as the last item when adding image
+                    if (_isAddingImage && index == _selectedImages.length) {
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8.0),
+                        width: 100.0,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8.0),
+                          color: const Color(0xFFF5F5F5),
+                          border: Border.all(
+                            color: const Color(0xFFE5E7EB),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF5796FF),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Adding...',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF9CA3AF),
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    // Show actual images
                     return Stack(
                       children: [
                         Container(
@@ -721,6 +1439,25 @@ class _CreatePostPageState extends State<CreatePostPage> {
     return '@user';
   }
 
+  // Helper to check if string is a URL
+  bool _isUrl(String? str) {
+    if (str == null) return false;
+    return str.startsWith('http://') || str.startsWith('https://');
+  }
+
+  // Helper to validate and log profile image URL
+  void _logProfileImageUrl(String? url) {
+    if (url != null && _isUrl(url)) {
+      print('Profile image URL: $url');
+      // Check if it's a valid Supabase URL format
+      if (url.contains('supabase.co/storage/v1/object/public/')) {
+        print('Valid Supabase URL format detected');
+      } else {
+        print('Warning: URL does not match expected Supabase format');
+      }
+    }
+  }
+
   // Convert base64 string to image bytes
   Uint8List _convertBase64ToImage(String base64String) {
     try {
@@ -738,18 +1475,98 @@ class _CreatePostPageState extends State<CreatePostPage> {
   }
 
   void _submitPost() async {
-    if (_postController.text.trim().isEmpty && _selectedImages.isEmpty) {
-      // Don't allow empty posts without any content or images
+    // Check character limit
+    if (_postController.text.length > 300) {
       Get.snackbar(
-        'Empty Post',
-        'Please add some text or images to your post',
+        'Character Limit Exceeded',
+        'Posts cannot exceed 300 characters',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.red,
         colorText: Colors.white,
       );
       return;
     }
 
+    if (_isThreadMode) {
+      // Validate thread posts
+      bool hasContent = false;
+      bool hasValidLength = true;
+
+      for (var threadPost in _threadPosts) {
+        if (threadPost.textController.text.length > 300) {
+          hasValidLength = false;
+          break;
+        }
+        if (threadPost.textController.text.trim().isNotEmpty ||
+            threadPost.images.isNotEmpty) {
+          hasContent = true;
+        }
+      }
+
+      if (!hasValidLength) {
+        Get.snackbar(
+          'Character Limit Exceeded',
+          'Thread posts cannot exceed 300 characters',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      if (!hasContent) {
+        Get.snackbar(
+          'Empty Thread',
+          'Please add some content to at least one post in the thread',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      await _createThreadPosts();
+    } else {
+      if (_postController.text.trim().isEmpty && _selectedImages.isEmpty) {
+        // Don't allow empty posts without any content or images
+        Get.snackbar(
+          'Empty Post',
+          'Please add some text or images to your post',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      await _createPost(isThread: false);
+    }
+  }
+
+  void _createThread() {
+    setState(() {
+      _isThreadMode = true;
+
+      // Add a new thread post (don't clear existing ones)
+      final newThreadPost = ThreadPost(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        textController: TextEditingController(),
+        images: [],
+      );
+      _threadPosts.add(newThreadPost);
+    });
+  }
+
+  void _removeThreadPost(int index) {
+    if (_threadPosts.length > 1) {
+      _threadPosts[index].textController.dispose();
+      setState(() {
+        _threadPosts.removeAt(index);
+      });
+    }
+  }
+
+  Future<void> _createPost({required bool isThread}) async {
     setState(() {
       _isPosting = true;
     });
@@ -791,7 +1608,9 @@ class _CreatePostPageState extends State<CreatePostPage> {
                       ),
                       SizedBox(height: 20),
                       Text(
-                        'Uploading ${_selectedImages.length} image(s)...',
+                        isThread
+                            ? 'Creating thread...'
+                            : 'Uploading ${_selectedImages.length} image(s)...',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -840,10 +1659,11 @@ class _CreatePostPageState extends State<CreatePostPage> {
       Get.back(); // Close create post page
       Get.offAllNamed('/feed'); // Navigate to feed, clearing stack
 
-      // Show creating post progress on feed (much faster now - just API call)
+      // Show creating post/thread progress on feed
       Get.showSnackbar(
         GetSnackBar(
-          message: 'Creating your post...',
+          message:
+              isThread ? 'Creating your thread...' : 'Creating your post...',
           showProgressIndicator: true,
           progressIndicatorBackgroundColor: Colors.white,
           progressIndicatorValueColor: AlwaysStoppedAnimation<Color>(
@@ -867,7 +1687,7 @@ class _CreatePostPageState extends State<CreatePostPage> {
               ),
               SizedBox(width: 12),
               Text(
-                'Creating your post...',
+                isThread ? 'Creating your thread...' : 'Creating your post...',
                 style: TextStyle(
                   color: Colors.black87,
                   fontSize: 14,
@@ -880,12 +1700,19 @@ class _CreatePostPageState extends State<CreatePostPage> {
         ),
       );
 
-      // Create post using our post creation service with image URLs
-      await _postService.createPost(
-        _postController.text,
-        _visibility,
-        imageUrls: uploadedImageUrls.isNotEmpty ? uploadedImageUrls : null,
-      );
+      if (isThread) {
+        // Create thread - multiple posts in sequence
+        await _createThreadPosts();
+      } else {
+        // Create single post
+        await _postService.createPost(
+          _postController.text.trim().isEmpty ? '' : _postController.text,
+          _visibility,
+          imageUrls: uploadedImageUrls.isNotEmpty ? uploadedImageUrls : null,
+        );
+      }
+
+      // Note: No need to clear state since we're navigating away
 
       // Dismiss progress snackbar
       Get.closeCurrentSnackbar();
@@ -893,7 +1720,10 @@ class _CreatePostPageState extends State<CreatePostPage> {
       // Show success snackbar
       Get.showSnackbar(
         GetSnackBar(
-          message: 'Post created successfully!',
+          message:
+              isThread
+                  ? 'Thread created successfully!'
+                  : 'Post created successfully!',
           icon: Icon(Icons.check_circle, color: Colors.white),
           duration: Duration(seconds: 2),
           backgroundColor: Colors.green,
@@ -926,6 +1756,163 @@ class _CreatePostPageState extends State<CreatePostPage> {
           print('CreatePostPage: Error cleaning up images: $cleanupError');
         }
       }
+
+      // Clean error message before showing to user
+      String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
+
+      // Show error
+      Get.showSnackbar(
+        GetSnackBar(
+          message: cleanError,
+          icon: Icon(Icons.error, color: Colors.white),
+          duration: Duration(seconds: 4),
+          backgroundColor: Colors.red,
+          borderRadius: 0,
+          margin: EdgeInsets.zero,
+          snackPosition: SnackPosition.TOP,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPosting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _createThreadPosts() async {
+    setState(() {
+      _isPosting = true;
+    });
+
+    String? parentId;
+
+    try {
+      // Navigate to feed AFTER starting thread creation
+      Get.back(); // Close create post page
+      Get.offAllNamed('/feed'); // Navigate to feed, clearing stack
+
+      // Show creating thread progress on feed
+      Get.showSnackbar(
+        GetSnackBar(
+          message: 'Creating your thread...',
+          showProgressIndicator: true,
+          progressIndicatorBackgroundColor: Colors.white,
+          progressIndicatorValueColor: AlwaysStoppedAnimation<Color>(
+            Color(0xFF5796FF),
+          ),
+          duration: Duration(seconds: 15),
+          isDismissible: false,
+          backgroundColor: Colors.white,
+          borderRadius: 0,
+          margin: EdgeInsets.zero,
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          messageText: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5796FF)),
+                ),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'Creating your thread...',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
+          ),
+          snackPosition: SnackPosition.TOP,
+        ),
+      );
+
+      // Create each thread post
+      for (int i = 0; i < _threadPosts.length; i++) {
+        final threadPost = _threadPosts[i];
+        final postContent = threadPost.textController.text.trim();
+
+        // Skip empty posts
+        if (postContent.isEmpty && threadPost.images.isEmpty) {
+          continue;
+        }
+
+        List<String>? imageUrls = null;
+
+        // Upload images for this thread post if any
+        if (threadPost.images.isNotEmpty) {
+          try {
+            imageUrls = await _storageService.uploadPostImages(
+              threadPost.images,
+            );
+          } catch (e) {
+            print('Error uploading images for thread post $i: $e');
+            // Continue without images
+          }
+        }
+
+        // Create post with parentId for thread continuity
+        final response = await _postService.createPost(
+          postContent.isEmpty ? '' : postContent,
+          _visibility,
+          imageUrls: imageUrls,
+          parentId: parentId,
+        );
+
+        // Set parentId for subsequent posts in the thread
+        if (parentId == null) {
+          // Extract post ID from response to use as parent for next posts
+          if (response.containsKey('id')) {
+            parentId = response['id'].toString();
+          } else if (response.containsKey('postId')) {
+            parentId = response['postId'].toString();
+          } else {
+            print(
+              'Warning: Could not extract post ID from response: $response',
+            );
+          }
+        }
+
+        // Add small delay between posts to ensure proper ordering
+        if (i < _threadPosts.length - 1) {
+          await Future.delayed(Duration(milliseconds: 500));
+        }
+      }
+
+      // Note: No need to clear state since we're navigating away
+
+      // Dismiss progress snackbar
+      Get.closeCurrentSnackbar();
+
+      // Show success snackbar
+      Get.showSnackbar(
+        GetSnackBar(
+          message: 'Thread created successfully!',
+          icon: Icon(Icons.check_circle, color: Colors.white),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.green,
+          borderRadius: 0,
+          margin: EdgeInsets.zero,
+          snackPosition: SnackPosition.TOP,
+        ),
+      );
+
+      // Reload posts on the feed (silently, without showing skeleton loader)
+      try {
+        final postController = Get.find<PostController>();
+        await postController.loadPosts(showLoading: false);
+      } catch (e) {
+        print('Error reloading posts: $e');
+      }
+    } catch (e) {
+      // Dismiss any dialogs or snackbars
+      Get.closeCurrentSnackbar();
 
       // Clean error message before showing to user
       String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
@@ -987,11 +1974,13 @@ class _CreatePostPageState extends State<CreatePostPage> {
                 ),
               )
               : ElevatedButton(
-                onPressed: _submitPost,
+                onPressed:
+                    _postController.text.length > 300 ? null : _submitPost,
                 style: ElevatedButton.styleFrom(
                   elevation: 0,
                   backgroundColor:
-                      _postController.text.trim().isEmpty
+                      _postController.text.trim().isEmpty ||
+                              _postController.text.length > 300
                           ? Color(0xffA4A4A4)
                           : Color(0xff5796FF),
                   minimumSize: Size(30, 32),
@@ -1017,103 +2006,117 @@ class _CreatePostPageState extends State<CreatePostPage> {
           const Divider(height: 1, color: Color(0xffE5E7EB)),
           const SizedBox(height: 20),
 
-          // User profile info
-          Obx(() {
-            final profile = _profileController.studentProfile.value;
-            return ListTile(
-              leading: GestureDetector(
-                onTap: () {
-                  // Navigate to profile page when avatar is clicked
-                  Get.to(() => const ProfilePage());
-                },
-                child: CircleAvatar(
-                  backgroundImage:
-                      profile?.profilePhotoUrl != null
-                          ? MemoryImage(
-                            _convertBase64ToImage(profile!.profilePhotoUrl!),
-                          )
-                          : null,
-                  backgroundColor:
-                      profile?.profilePhotoUrl == null
-                          ? Color(0xff5796FF).withValues(alpha: 0.2)
-                          : null,
-                  child:
-                      profile?.profilePhotoUrl == null
-                          ? Icon(
-                            Icons.person,
-                            color: Color(0xff5796FF).withValues(alpha: 0.7),
-                          )
-                          : null,
+          // User profile info - only show when not in thread mode
+          if (!_isThreadMode)
+            Obx(() {
+              final profile = _profileController.studentProfile.value;
+              _logProfileImageUrl(profile?.profilePhotoUrl);
+              return ListTile(
+                leading: GestureDetector(
+                  onTap: () {
+                    // Navigate to profile page when avatar is clicked
+                    Get.to(() => const ProfilePage());
+                  },
+                  child: CircleAvatar(
+                    backgroundImage:
+                        profile?.profilePhotoUrl != null
+                            ? _isUrl(profile!.profilePhotoUrl)
+                                ? NetworkImage(profile.profilePhotoUrl!)
+                                    as ImageProvider
+                                : MemoryImage(
+                                  _convertBase64ToImage(
+                                    profile.profilePhotoUrl!,
+                                  ),
+                                )
+                            : null,
+                    onBackgroundImageError: (exception, stackTrace) {
+                      debugPrint(
+                        'Error loading profile image in create post: $exception',
+                      );
+                      // Force rebuild to show fallback icon
+                      setState(() {});
+                    },
+                    backgroundColor: Color(0xff5796FF).withValues(alpha: 0.2),
+                    child:
+                        profile?.profilePhotoUrl == null
+                            ? Icon(
+                              Icons.person,
+                              color: Color(0xff5796FF).withValues(alpha: 0.7),
+                            )
+                            : null,
+                  ),
                 ),
-              ),
-              title: Row(
-                children: [
-                  Text(
-                    profile?.fullName ?? 'Anonymous',
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w500,
-                      fontStyle: FontStyle.normal,
-                      fontSize: 16,
-                      height: 22 / 16,
-                      letterSpacing: -0.41,
-                      color: Color(0xff333333),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _getUserHandle(profile),
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w400,
-                      fontStyle: FontStyle.normal,
-                      fontSize: 12.0,
-                      height: 22 / 12,
-                      letterSpacing: -0.41,
-                      color: Color(0xFF606060),
-                    ),
-                  ),
-                ],
-              ),
-              subtitle: GestureDetector(
-                onTap: () => _showAudienceSelector(context),
-                child: Container(
-                  margin: const EdgeInsets.only(top: 2.0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _getVisibilityIcon(_visibility),
-                      const SizedBox(width: 8),
-                      Text(
-                        _visibility,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontWeight: FontWeight.w500,
-                          fontStyle: FontStyle.normal,
-                          fontSize: 14.0,
-                          height: 1.0,
-                          letterSpacing: 0.0,
-                          color: Color(0xff333333),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.keyboard_arrow_down_outlined,
+                title: Row(
+                  children: [
+                    Text(
+                      profile?.fullName ?? 'Anonymous',
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w500,
+                        fontStyle: FontStyle.normal,
+                        fontSize: 16,
+                        height: 22 / 16,
+                        letterSpacing: -0.41,
                         color: Color(0xff333333),
-                        size: 20,
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getUserHandle(profile),
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.normal,
+                        fontSize: 12.0,
+                        height: 22 / 12,
+                        letterSpacing: -0.41,
+                        color: Color(0xFF606060),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: GestureDetector(
+                  onTap: () => _showAudienceSelector(context),
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 2.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _getVisibilityIcon(_visibility),
+                        const SizedBox(width: 8),
+                        Text(
+                          _visibility,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 14.0,
+                            height: 1.0,
+                            letterSpacing: 0.0,
+                            color: Color(0xff333333),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_outlined,
+                          color: Color(0xff333333),
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
 
-          // Content area - post text and images
+          // Content area - post text and images or thread posts
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: _buildRichTextEditor(),
+              child:
+                  _isThreadMode
+                      ? _buildThreadInterface()
+                      : _buildRichTextEditor(),
             ),
           ),
           PostCreationToolbar(
@@ -1125,11 +2128,34 @@ class _CreatePostPageState extends State<CreatePostPage> {
               _showMentionSelector(context);
             },
             onImagePressed: () {
-              _pickImages();
+              if (_isThreadMode) {
+                // In thread mode, add image to the last thread post
+                if (_threadPosts.isNotEmpty) {
+                  _pickImagesForThreadPost(_threadPosts.length - 1);
+                }
+              } else {
+                _pickImages();
+              }
             },
             onAddPressed: () {
               // TODO: Implement additional features
             },
+            onThreadPressed: () {
+              if (_threadPosts.length >= 3) {
+                // Show message when limit is reached
+                Get.snackbar(
+                  'Thread Limit',
+                  'You can only create up to 3 posts in a thread',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 2),
+                );
+                return;
+              }
+              _createThread();
+            },
+            threadCount: _threadPosts.length,
           ),
         ],
       ),

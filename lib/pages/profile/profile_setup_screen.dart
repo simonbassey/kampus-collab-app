@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/student_profile_controller.dart';
 import '../../utils/error_message_helper.dart';
+import '../../services/profile_image_upload_service.dart';
+import '../../services/supabase_service.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -296,9 +298,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
+  // Helper to check if string is a URL
+  bool _isUrl(String? str) {
+    if (str == null) return false;
+    return str.startsWith('http://') || str.startsWith('https://');
+  }
+
   Widget _buildProfileAvatar() {
     final profile = _profileController.studentProfile.value;
-
+    
     return Center(
       child: Stack(
         children: [
@@ -318,9 +326,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         )
                         : profile?.profilePhotoUrl != null
                         ? DecorationImage(
-                          image: MemoryImage(
-                            _convertBase64ToImage(profile!.profilePhotoUrl!),
-                          ),
+                          image: _isUrl(profile!.profilePhotoUrl)
+                              ? NetworkImage(profile.profilePhotoUrl!) as ImageProvider
+                              : MemoryImage(
+                                  _convertBase64ToImage(profile.profilePhotoUrl!),
+                                ),
                           fit: BoxFit.cover,
                         )
                         : null,
@@ -617,10 +627,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     isLoading.value = true;
     isSuccess.value = false;
 
+    String? profilePhotoUrl;
+    String? idCardUrl;
+    final uploadService = ProfileImageUploadService();
+
     // Show loading dialog
     Get.dialog(
       WillPopScope(
-        onWillPop: () async => false, // Prevent dismissing by tapping outside
+        onWillPop: () async => false,
         child: Dialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -637,7 +651,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 SizedBox(height: 20),
                 Text(
-                  'Saving your profile...',
+                  _profileImageFile != null || _identityCardFile != null
+                      ? 'Uploading images...'
+                      : 'Saving your profile...',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -664,7 +680,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     bool success = false;
     try {
-      // Try updating/creating profile using the new API
+      // Upload profile photo to Supabase if selected
+      if (_profileImageFile != null) {
+        if (!SupabaseService.isInitialized) {
+          throw Exception('Supabase is not initialized');
+        }
+
+        print('ProfileSetupScreen: Uploading profile photo to Supabase');
+        profilePhotoUrl = await uploadService.uploadProfilePhoto(
+          _profileImageFile!,
+        );
+        print('ProfileSetupScreen: Profile photo URL: $profilePhotoUrl');
+      }
+
+      // Upload ID card to Supabase if selected
+      if (_identityCardFile != null) {
+        if (!SupabaseService.isInitialized) {
+          throw Exception('Supabase is not initialized');
+        }
+
+        print('ProfileSetupScreen: Uploading ID card to Supabase');
+        idCardUrl = await uploadService.uploadIdCard(_identityCardFile!);
+        print('ProfileSetupScreen: ID card URL: $idCardUrl');
+      }
+
+      // Try updating/creating profile using the new API with image URLs
       print('Attempting to save profile with new API...');
       success = await _profileController.updateProfileWithNewAPI(
         shortBio:
@@ -679,8 +719,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             _academicEmailController.text.isNotEmpty
                 ? _academicEmailController.text
                 : null,
-        profileImageFile: _profileImageFile,
-        idCardFile: _identityCardFile,
+        profileImageUrl: profilePhotoUrl,
+        idCardUrl: idCardUrl,
       );
 
       // Close loading dialog
@@ -838,6 +878,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       // Close loading dialog if still open
       if (Get.isDialogOpen ?? false) {
         Get.back();
+      }
+
+      // Clean up uploaded images if profile update failed
+      if (profilePhotoUrl != null || idCardUrl != null) {
+        print('ProfileSetupScreen: Cleaning up uploaded images due to error');
+        try {
+          if (profilePhotoUrl != null) {
+            await uploadService.deleteImage(profilePhotoUrl);
+          }
+          if (idCardUrl != null) {
+            await uploadService.deleteImage(idCardUrl);
+          }
+        } catch (cleanupError) {
+          print('ProfileSetupScreen: Error cleaning up images: $cleanupError');
+        }
       }
 
       // Clean the exception message

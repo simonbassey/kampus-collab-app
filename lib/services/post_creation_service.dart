@@ -12,6 +12,7 @@ class PostCreationService {
     String visibility, {
     List<String>? imagePaths, // Deprecated: use imageUrls instead
     List<String>? imageUrls, // Image URLs from Supabase storage
+    String? parentId, // For thread creation
   }) async {
     // Check authentication
     if (!_authController.isAuthenticated.value) {
@@ -32,6 +33,9 @@ class PostCreationService {
       contentType = 'Image';
     }
 
+    // Determine post type based on whether it's a thread reply
+    String postType = parentId != null ? 'Reply' : 'Original';
+
     final response = await http.post(
       Uri.parse(ApiConstants.createPost),
       headers: {
@@ -39,12 +43,12 @@ class PostCreationService {
         'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
-        'content': content,
-        'contentType': contentType,
-        'mediaUrls': mediaUrls,
-        'audience': _convertVisibilityToApiValue(visibility),
-        // Don't include parentId for original posts (backend validation issue)
-        'postType': 'Original',
+        'Content': content.isEmpty && mediaUrls.isNotEmpty ? ' ' : content, // Ensure Content is never empty when images exist
+        'ContentType': contentType,
+        'MediaUrls': mediaUrls,
+        'Audience': _convertVisibilityToApiValue(visibility),
+        'PostType': postType,
+        if (parentId != null) 'ParentId': parentId,
       }),
     );
 

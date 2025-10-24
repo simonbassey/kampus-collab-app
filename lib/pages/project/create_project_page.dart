@@ -273,7 +273,10 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Search hashtags',
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.grey,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
@@ -288,15 +291,22 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                             filteredHashtags = List.from(trendingHashtags);
                           } else {
                             // Filter existing hashtags
-                            filteredHashtags = trendingHashtags
-                                .where((hashtag) => hashtag.toLowerCase().contains(value.toLowerCase()))
-                                .toList();
-                            
+                            filteredHashtags =
+                                trendingHashtags
+                                    .where(
+                                      (hashtag) => hashtag
+                                          .toLowerCase()
+                                          .contains(value.toLowerCase()),
+                                    )
+                                    .toList();
+
                             // Add the search term as a hashtag if it's not in the list
                             final searchTerm = value.replaceAll('#', '').trim();
-                            if (searchTerm.isNotEmpty && 
-                                !filteredHashtags.contains(searchTerm) && 
-                                !filteredHashtags.map((e) => e.toLowerCase()).contains(searchTerm.toLowerCase())) {
+                            if (searchTerm.isNotEmpty &&
+                                !filteredHashtags.contains(searchTerm) &&
+                                !filteredHashtags
+                                    .map((e) => e.toLowerCase())
+                                    .contains(searchTerm.toLowerCase())) {
                               filteredHashtags.insert(0, searchTerm);
                             }
                           }
@@ -305,21 +315,28 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFE5E7EB),
+                  ),
                   // Results
                   Expanded(
                     child: ListView.separated(
                       itemCount: filteredHashtags.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFE5E7EB),
-                        indent: 16,
-                        endIndent: 16,
-                      ),
+                      separatorBuilder:
+                          (context, index) => const Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Color(0xFFE5E7EB),
+                            indent: 16,
+                            endIndent: 16,
+                          ),
                       itemBuilder: (context, index) {
                         return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                           title: Text(
                             '#${filteredHashtags[index]}',
                             style: const TextStyle(
@@ -330,7 +347,10 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                           ),
                           onTap: () {
                             // Insert hashtag at current cursor position in the description
-                            _insertTextInController(_descriptionController, '#${filteredHashtags[index]} ');
+                            _insertTextInController(
+                              _descriptionController,
+                              '#${filteredHashtags[index]} ',
+                            );
                             Navigator.pop(context); // Close bottom sheet
                           },
                         );
@@ -350,16 +370,66 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
   void _showMentionSelector(BuildContext context) {
     // Example users to mention (potential team members)
     final List<Map<String, dynamic>> users = [
-      {'name': 'Precious Eyo', 'username': 'Precious_Eyo', 'skills': 'UI/UX, Frontend', 'photo': null},
-      {'name': 'John Smith', 'username': 'johnsmith', 'skills': 'UI/UX, Frontend', 'photo': null},
-      {'name': 'Sarah Johnson', 'username': 'sarah_j', 'skills': 'Backend, Database', 'photo': null},
-      {'name': 'Michael Brown', 'username': 'mike.brown', 'skills': 'Mobile Dev, Flutter', 'photo': null},
-      {'name': 'Jessica Williams', 'username': 'jesswilliams', 'skills': 'Product Management', 'photo': null},
-      {'name': 'David Miller', 'username': 'davemiller', 'skills': 'DevOps, Cloud', 'photo': null},
-      {'name': 'Amanda Taylor', 'username': 'amandatay', 'skills': 'Data Science, ML', 'photo': null},
-      {'name': 'Robert Davis', 'username': 'robdavis', 'skills': 'Frontend, React', 'photo': null},
-      {'name': 'Jennifer Garcia', 'username': 'jgarcia', 'skills': 'UI Design, Graphics', 'photo': null},
-      {'name': 'William Rodriguez', 'username': 'willrod', 'skills': 'Backend, API Design', 'photo': null},
+      {
+        'name': 'Precious Eyo',
+        'username': 'Precious_Eyo',
+        'skills': 'UI/UX, Frontend',
+        'photo': null,
+      },
+      {
+        'name': 'John Smith',
+        'username': 'johnsmith',
+        'skills': 'UI/UX, Frontend',
+        'photo': null,
+      },
+      {
+        'name': 'Sarah Johnson',
+        'username': 'sarah_j',
+        'skills': 'Backend, Database',
+        'photo': null,
+      },
+      {
+        'name': 'Michael Brown',
+        'username': 'mike.brown',
+        'skills': 'Mobile Dev, Flutter',
+        'photo': null,
+      },
+      {
+        'name': 'Jessica Williams',
+        'username': 'jesswilliams',
+        'skills': 'Product Management',
+        'photo': null,
+      },
+      {
+        'name': 'David Miller',
+        'username': 'davemiller',
+        'skills': 'DevOps, Cloud',
+        'photo': null,
+      },
+      {
+        'name': 'Amanda Taylor',
+        'username': 'amandatay',
+        'skills': 'Data Science, ML',
+        'photo': null,
+      },
+      {
+        'name': 'Robert Davis',
+        'username': 'robdavis',
+        'skills': 'Frontend, React',
+        'photo': null,
+      },
+      {
+        'name': 'Jennifer Garcia',
+        'username': 'jgarcia',
+        'skills': 'UI Design, Graphics',
+        'photo': null,
+      },
+      {
+        'name': 'William Rodriguez',
+        'username': 'willrod',
+        'skills': 'Backend, API Design',
+        'photo': null,
+      },
     ];
 
     final TextEditingController searchController = TextEditingController();
@@ -395,7 +465,10 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Search people by name or skills',
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.grey,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
@@ -406,42 +479,63 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       ),
                       onChanged: (value) {
                         setState(() {
-                          filteredUsers = users
-                              .where((user) =>
-                                  user['name'].toLowerCase().contains(value.toLowerCase()) ||
-                                  user['username'].toLowerCase().contains(value.toLowerCase()) ||
-                                  user['skills'].toLowerCase().contains(value.toLowerCase()))
-                              .toList();
+                          filteredUsers =
+                              users
+                                  .where(
+                                    (user) =>
+                                        user['name'].toLowerCase().contains(
+                                          value.toLowerCase(),
+                                        ) ||
+                                        user['username'].toLowerCase().contains(
+                                          value.toLowerCase(),
+                                        ) ||
+                                        user['skills'].toLowerCase().contains(
+                                          value.toLowerCase(),
+                                        ),
+                                  )
+                                  .toList();
                         });
                       },
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFE5E7EB),
+                  ),
                   // Results
                   Expanded(
                     child: ListView.separated(
                       itemCount: filteredUsers.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFE5E7EB),
-                        indent: 72, // Indent to align with profile image
-                        endIndent: 16,
-                      ),
+                      separatorBuilder:
+                          (context, index) => const Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Color(0xFFE5E7EB),
+                            indent: 72, // Indent to align with profile image
+                            endIndent: 16,
+                          ),
                       itemBuilder: (context, index) {
                         final user = filteredUsers[index];
                         return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                           leading: CircleAvatar(
                             radius: 20,
-                            backgroundColor: const Color(0xff5796FF).withOpacity(0.2),
-                            child: user['photo'] == null
-                                ? Icon(
-                                    Icons.person,
-                                    color: const Color(0xff5796FF).withOpacity(0.7),
-                                  )
-                                : null,
+                            backgroundColor: const Color(
+                              0xff5796FF,
+                            ).withOpacity(0.2),
+                            child:
+                                user['photo'] == null
+                                    ? Icon(
+                                      Icons.person,
+                                      color: const Color(
+                                        0xff5796FF,
+                                      ).withOpacity(0.7),
+                                    )
+                                    : null,
                           ),
                           title: Text(
                             user['name'],
@@ -474,7 +568,10 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                           ),
                           onTap: () {
                             // Insert mention at current cursor position in the description
-                            _insertTextInController(_descriptionController, '@${user["username"]} ');
+                            _insertTextInController(
+                              _descriptionController,
+                              '@${user["username"]} ',
+                            );
                             Navigator.pop(context); // Close bottom sheet
                           },
                         );
@@ -494,39 +591,39 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
   void _insertTextInController(TextEditingController controller, String text) {
     final TextSelection selection = controller.selection;
     final String currentText = controller.text;
-    
+
     final String newText = currentText.replaceRange(
       selection.start,
       selection.end,
       text,
     );
-    
+
     controller.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(
         offset: selection.baseOffset + text.length,
       ),
     );
-    
+
     // Refresh UI to show formatting
     setState(() {});
   }
-  
+
   // Build formatted text with styled hashtags and mentions
   Widget _buildFormattedText(String text) {
     // If text is empty, return an empty container
     if (text.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     // Split text into parts by word boundaries
     final List<TextSpan> spans = [];
     final RegExp regex = RegExp(r'\B#\w+|\B@\w+|\s+|[^\s#@]+');
     final Iterable<Match> matches = regex.allMatches(text);
-    
+
     for (final Match match in matches) {
       final String part = match.group(0) ?? '';
-      
+
       if (part.startsWith('#')) {
         // Hashtag styling
         spans.add(
@@ -568,7 +665,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         );
       }
     }
-    
+
     return RichText(
       text: TextSpan(
         style: const TextStyle(
@@ -630,6 +727,12 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
 
     // Default fallback
     return '@user';
+  }
+
+  // Helper to check if string is a URL
+  bool _isUrl(String? str) {
+    if (str == null) return false;
+    return str.startsWith('http://') || str.startsWith('https://');
   }
 
   // Convert base64 string to image bytes
@@ -797,10 +900,18 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                 child: CircleAvatar(
                   backgroundImage:
                       profile?.profilePhotoUrl != null
-                          ? MemoryImage(
-                            _convertBase64ToImage(profile!.profilePhotoUrl!),
-                          )
+                          ? _isUrl(profile!.profilePhotoUrl)
+                              ? NetworkImage(profile.profilePhotoUrl!)
+                                  as ImageProvider
+                              : MemoryImage(
+                                _convertBase64ToImage(profile.profilePhotoUrl!),
+                              )
                           : null,
+                  onBackgroundImageError: (exception, stackTrace) {
+                    debugPrint(
+                      'Error loading profile image in create project: $exception',
+                    );
+                  },
                   backgroundColor:
                       profile?.profilePhotoUrl == null
                           ? const Color(0xff5796FF).withOpacity(0.2)
@@ -997,7 +1108,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                                   horizontal: 16,
                                   vertical: 12,
                                 ),
-                                child: _buildFormattedText(_descriptionController.text),
+                                child: _buildFormattedText(
+                                  _descriptionController.text,
+                                ),
                               ),
                             ),
                         ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/post_model.dart';
+import '../../../widgets/skeleton_loader.dart';
 import 'post_base.dart';
 import 'image_viewer.dart';
 
@@ -9,11 +10,11 @@ class ImagePost extends StatelessWidget {
   final bool isInDetailScreen;
 
   ImagePost({
-    Key? key,
+    super.key,
     required this.post,
     this.contextOverride,
     this.isInDetailScreen = false,
-  }) : super(key: key);
+  });
 
   BuildContext _getContext() {
     // This is a workaround to access context for showing dialogs from a stateless widget
@@ -73,20 +74,10 @@ class ImagePost extends StatelessWidget {
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
-                      return Container(
+                      return const SkeletonLoader(
                         width: double.infinity,
                         height: 200,
-                        color: const Color(0xFFEEF5FF),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value:
-                                loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                            color: const Color(0xFF5796FF),
-                          ),
-                        ),
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
                       );
                     },
                     errorBuilder: (context, error, stackTrace) {
@@ -146,6 +137,28 @@ class ImagePost extends StatelessWidget {
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const SkeletonLoader(
+                                width: double.infinity,
+                                height: double.infinity,
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(8),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFFEEF5FF),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    size: 32,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
                           )
                           : Image.asset(
                             imageUrl,
@@ -157,7 +170,7 @@ class ImagePost extends StatelessWidget {
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                   ),
                   width: double.infinity,
                   height: double.infinity,
@@ -192,19 +205,10 @@ class ImagePost extends StatelessWidget {
                       fit: BoxFit.cover,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
-                        return Container(
-                          color: const Color(0xFFEEF5FF),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value:
-                                  loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                              color: const Color(0xFF5796FF),
-                              strokeWidth: 2,
-                            ),
-                          ),
+                        return const SkeletonLoader(
+                          width: double.infinity,
+                          height: double.infinity,
+                          borderRadius: BorderRadius.all(Radius.circular(8)),
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {

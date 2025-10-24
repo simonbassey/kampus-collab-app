@@ -121,18 +121,23 @@ class _CommentItemState extends State<CommentItem> {
                   backgroundColor: Color(0xFFEEF5FF),
                   backgroundImage:
                       comment.userAvatar.isNotEmpty &&
-                              comment.userAvatar.startsWith('http')
+                              (comment.userAvatar.startsWith('http') ||
+                                  comment.userAvatar.startsWith('https'))
                           ? NetworkImage(comment.userAvatar)
                           : null,
+                  onBackgroundImageError: (exception, stackTrace) {
+                    debugPrint('Error loading comment avatar: $exception');
+                  },
                   child:
-                      comment.userAvatar.isNotEmpty &&
-                              comment.userAvatar.startsWith('http')
-                          ? null
-                          : Icon(
+                      comment.userAvatar.isEmpty ||
+                              (!comment.userAvatar.startsWith('http') &&
+                                  !comment.userAvatar.startsWith('https'))
+                          ? Icon(
                             Icons.person,
                             size: 20,
                             color: Color(0xFF5796FF),
-                          ),
+                          )
+                          : null,
                 ),
               ),
               const SizedBox(width: 12.0),

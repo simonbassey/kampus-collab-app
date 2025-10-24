@@ -5,13 +5,14 @@ import '../../../models/post_model.dart';
 
 class PostComposition extends StatefulWidget {
   final Function(PostModel) onPostCreated;
-  
-  const PostComposition({
-    Key? key,
-    required this.onPostCreated,
-  }) : super(key: key);
 
-  static Future<void> show(BuildContext context, Function(PostModel) onPostCreated) async {
+  const PostComposition({Key? key, required this.onPostCreated})
+    : super(key: key);
+
+  static Future<void> show(
+    BuildContext context,
+    Function(PostModel) onPostCreated,
+  ) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -72,9 +73,10 @@ class _PostCompositionState extends State<PostComposition> {
   Widget _buildHeader() {
     return Row(
       children: [
-        const CircleAvatar(
+        CircleAvatar(
           radius: 20.0,
-          backgroundImage: NetworkImage('https://randomuser.me/api/portraits/men/1.jpg'),
+          backgroundColor: const Color(0xFFEEF5FF),
+          child: Icon(Icons.person, size: 24, color: const Color(0xFF5796FF)),
         ),
         const SizedBox(width: 12.0),
         const Column(
@@ -82,17 +84,11 @@ class _PostCompositionState extends State<PostComposition> {
           children: [
             Text(
               'Create Post',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16.0,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0),
             ),
             Text(
               'Share your thoughts',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12.0,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 12.0),
             ),
           ],
         ),
@@ -212,22 +208,23 @@ class _PostCompositionState extends State<PostComposition> {
                 borderRadius: BorderRadius.circular(8.0),
               ),
             ),
-            child: _isCreatingPost
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            child:
+                _isCreatingPost
+                    ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.0,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                    : const Text(
+                      'Post',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  )
-                : const Text(
-                    'Post',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
           ),
         ),
       ],
@@ -265,10 +262,12 @@ class _PostCompositionState extends State<PostComposition> {
 
   Future<void> _pickImage() async {
     final List<XFile>? images = await _picker.pickMultiImage();
-    
+
     if (images != null && images.isNotEmpty) {
       setState(() {
-        _selectedImages.addAll(images.map((image) => File(image.path)).toList());
+        _selectedImages.addAll(
+          images.map((image) => File(image.path)).toList(),
+        );
       });
     }
   }

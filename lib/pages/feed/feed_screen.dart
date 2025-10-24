@@ -10,6 +10,7 @@ import 'post_components/image_post.dart';
 import 'post_components/link_post.dart';
 import '../../models/post_model.dart';
 import '../../controllers/post_controller.dart';
+import '../indox/inbox_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -253,7 +254,11 @@ class _FeedScreenState extends State<FeedScreen>
     return Scaffold(
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 0,
-        onTap: (index) {},
+        onTap: (index) {
+          if (index == 1) {
+            Get.to(() => const InboxScreen());
+          }
+        },
       ),
       backgroundColor: Colors.white,
       body: SafeArea(

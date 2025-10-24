@@ -386,11 +386,15 @@ class _ProfilePageState extends State<ProfilePage>
                       image:
                           profile?.profilePhotoUrl != null
                               ? DecorationImage(
-                                image: MemoryImage(
-                                  _convertBase64ToImage(
-                                    profile!.profilePhotoUrl!,
-                                  ),
-                                ),
+                                image:
+                                    _isUrl(profile!.profilePhotoUrl)
+                                        ? NetworkImage(profile.profilePhotoUrl!)
+                                            as ImageProvider
+                                        : MemoryImage(
+                                          _convertBase64ToImage(
+                                            profile.profilePhotoUrl!,
+                                          ),
+                                        ),
                                 fit: BoxFit.cover,
                               )
                               : const DecorationImage(
@@ -471,22 +475,70 @@ class _ProfilePageState extends State<ProfilePage>
     });
   }
 
+  // Helper to check if string is a URL
+  bool _isUrl(String? str) {
+    if (str == null) return false;
+    return str.startsWith('http://') || str.startsWith('https://');
+  }
+
   // Helper method to convert base64 string to image bytes
   Uint8List _convertBase64ToImage(String base64String) {
-    return base64Decode(base64String);
+    try {
+      // Remove any data URI prefix if present
+      String sanitizedBase64 = base64String;
+      if (base64String.contains(',')) {
+        sanitizedBase64 = base64String.split(',')[1];
+      }
+      return base64Decode(sanitizedBase64);
+    } catch (e) {
+      print('Error converting base64 to image: $e');
+      // Return a 1x1 transparent pixel as fallback
+      return Uint8List.fromList([0, 0, 0, 0]);
+    }
   }
 
   // Method to show expanded profile photo
   void _showExpandedProfilePhoto(dynamic profile) {
     if (profile?.profilePhotoUrl != null) {
-      // Show the profile photo from base64 data
-      final imageData = _convertBase64ToImage(profile.profilePhotoUrl!);
-      showDialog(
-        context: context,
-        builder:
-            (context) =>
-                ProfilePhotoViewer(photoData: imageData, isAssetImage: false),
-      );
+      final photoUrl = profile.profilePhotoUrl!;
+
+      if (_isUrl(photoUrl)) {
+        // Show network image
+        showDialog(
+          context: context,
+          builder:
+              (context) => Dialog(
+                backgroundColor: Colors.transparent,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        photoUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const CircularProgressIndicator(
+                            color: Color(0xFF5796FF),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+        );
+      } else {
+        // Show base64 image
+        final imageData = _convertBase64ToImage(photoUrl);
+        showDialog(
+          context: context,
+          builder:
+              (context) =>
+                  ProfilePhotoViewer(photoData: imageData, isAssetImage: false),
+        );
+      }
     } else {
       // Show the default avatar
       showDialog(

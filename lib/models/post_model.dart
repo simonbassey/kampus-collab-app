@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 enum PostType { text, image, link }
 
@@ -67,7 +68,14 @@ class PostModel {
 
     // Handle the case where media URLs could be a string, JSON string, or a list
     List<String> parseMediaUrls(dynamic mediaUrls) {
-      if (mediaUrls == null) return [];
+      debugPrint(
+        'PostModel: Parsing mediaUrls: $mediaUrls (type: ${mediaUrls.runtimeType})',
+      );
+
+      if (mediaUrls == null) {
+        debugPrint('PostModel: mediaUrls is null');
+        return [];
+      }
 
       if (mediaUrls is String) {
         // Check if it's a JSON-encoded array string
@@ -76,18 +84,27 @@ class PostModel {
             // Parse JSON string to list
             final dynamic decoded = jsonDecode(mediaUrls);
             if (decoded is List) {
-              return decoded.map((url) => url.toString()).toList();
+              final urls = decoded.map((url) => url.toString()).toList();
+              debugPrint(
+                'PostModel: Parsed ${urls.length} URLs from JSON string: $urls',
+              );
+              return urls;
             }
           } catch (e) {
-            print('Error parsing mediaUrls JSON: $e');
+            debugPrint('PostModel: Error parsing mediaUrls JSON: $e');
           }
         }
         // Single URL string
-        return mediaUrls.isNotEmpty ? [mediaUrls] : [];
+        final urls = mediaUrls.isNotEmpty ? <String>[mediaUrls] : <String>[];
+        debugPrint('PostModel: Single URL: $urls');
+        return urls;
       } else if (mediaUrls is List) {
-        return mediaUrls.map((url) => url.toString()).toList();
+        final urls = List<String>.from(mediaUrls.map((url) => url.toString()));
+        debugPrint('PostModel: Parsed ${urls.length} URLs from list: $urls');
+        return urls;
       }
 
+      debugPrint('PostModel: Unknown mediaUrls type, returning empty list');
       return [];
     }
 

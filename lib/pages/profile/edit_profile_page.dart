@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../controllers/student_profile_controller.dart';
 import '../../utils/error_message_helper.dart';
+import '../../services/profile_image_upload_service.dart';
+import '../../services/supabase_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -130,23 +132,92 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _saveProfile() async {
+    String? profilePhotoUrl;
+    String? idCardUrl;
+    final uploadService = ProfileImageUploadService();
+
     // Show loading indicator
     Get.dialog(
-      const Center(child: CircularProgressIndicator(color: Color(0xFF5796FF))),
+      WillPopScope(
+        onWillPop: () async => false,
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  color: Color(0xFF5796FF),
+                  strokeWidth: 3,
+                ),
+                SizedBox(height: 20),
+                Text(
+                  _profileImage != null || _identityCardImage != null
+                      ? 'Uploading images...'
+                      : 'Saving your profile...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Inter',
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Please wait',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Poppins',
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       barrierDismissible: false,
     );
 
-    // Log the request payload for debugging
-    final requestPayload = {
-      'shortBio': _shortBioController.text,
-      'identityNumber': _identityNumberController.text,
-      'academicEmail': _academicEmailController.text,
-      'hasProfileImage': _profileImage != null,
-      'hasIdentityCard': _identityCardImage != null,
-    };
-    print('API Request payload: $requestPayload');
-
     try {
+      // Upload profile photo to Supabase if selected
+      if (_profileImage != null) {
+        if (!SupabaseService.isInitialized) {
+          throw Exception('Supabase is not initialized');
+        }
+
+        print('EditProfilePage: Uploading profile photo to Supabase');
+        profilePhotoUrl = await uploadService.uploadProfilePhoto(
+          _profileImage!,
+        );
+        print('EditProfilePage: Profile photo URL: $profilePhotoUrl');
+      }
+
+      // Upload ID card to Supabase if selected
+      if (_identityCardImage != null) {
+        if (!SupabaseService.isInitialized) {
+          throw Exception('Supabase is not initialized');
+        }
+
+        print('EditProfilePage: Uploading ID card to Supabase');
+        idCardUrl = await uploadService.uploadIdCard(_identityCardImage!);
+        print('EditProfilePage: ID card URL: $idCardUrl');
+      }
+
+      // Log the request payload for debugging
+      final requestPayload = {
+        'shortBio': _shortBioController.text,
+        'identityNumber': _identityNumberController.text,
+        'academicEmail': _academicEmailController.text,
+        'profilePhotoUrl': profilePhotoUrl,
+        'idCardUrl': idCardUrl,
+      };
+      print('API Request payload: $requestPayload');
+
       bool success = await _profileController.updateProfileWithNewAPI(
         shortBio:
             _shortBioController.text.isNotEmpty
@@ -160,8 +231,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
             _academicEmailController.text.isNotEmpty
                 ? _academicEmailController.text
                 : null,
-        profileImageFile: _profileImage,
-        idCardFile: _identityCardImage,
+        profileImageUrl: profilePhotoUrl,
+        idCardUrl: idCardUrl,
       );
 
       // If the update failed, show helpful error message
@@ -263,7 +334,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
       print('Stack trace: $stackTrace');
 
       // Close loading indicator
-      Get.back();
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
+      // Clean up uploaded images if profile update failed
+      if (profilePhotoUrl != null || idCardUrl != null) {
+        print('EditProfilePage: Cleaning up uploaded images due to error');
+        try {
+          if (profilePhotoUrl != null) {
+            await uploadService.deleteImage(profilePhotoUrl);
+          }
+          if (idCardUrl != null) {
+            await uploadService.deleteImage(idCardUrl);
+          }
+        } catch (cleanupError) {
+          print('EditProfilePage: Error cleaning up images: $cleanupError');
+        }
+      }
 
       // Clean exception message before showing to user
       String cleanError = ErrorMessageHelper.cleanErrorMessage(e.toString());
@@ -575,6 +663,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
+  // Helper to check if string is a URL
+  bool _isUrl(String? str) {
+    if (str == null) return false;
+    return str.startsWith('http://') || str.startsWith('https://');
+  }
+
   Widget _buildProfileAvatar(dynamic profile) {
     return Center(
       child: Stack(
@@ -595,9 +689,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         )
                         : profile?.profilePhotoUrl != null
                         ? DecorationImage(
-                          image: MemoryImage(
-                            _convertBase64ToImage(profile.profilePhotoUrl!),
-                          ),
+                          image: _isUrl(profile.profilePhotoUrl)
+                              ? NetworkImage(profile.profilePhotoUrl!) as ImageProvider
+                              : MemoryImage(
+                                  _convertBase64ToImage(profile.profilePhotoUrl!),
+                                ),
                           fit: BoxFit.cover,
                         )
                         : null,
