@@ -53,7 +53,7 @@ class CommentModel {
       userId: 'user_$id',
       userName: 'User $id',
       userAvatar: 'https://randomuser.me/api/portraits/men/$id.jpg',
-      userHandle: '@user$id',
+      userHandle: '@${'User $id'.toLowerCase().replaceAll(' ', '')}',
       content: content,
       createdAt:
           createdAt ?? DateTime.now().subtract(Duration(hours: int.parse(id))),

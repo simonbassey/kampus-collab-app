@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +9,7 @@ import '../../controllers/student_profile_controller.dart';
 import '../../utils/error_message_helper.dart';
 import '../../services/profile_image_upload_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/username_service.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -17,6 +19,7 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _shortBioController = TextEditingController();
   final TextEditingController _identityNumberController =
       TextEditingController();
@@ -45,6 +48,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   // Form change tracking
   bool _isFormChanged = false;
+
+  // Check if required fields are filled
+  bool get _isFormValid {
+    return _shortBioController.text.trim().isNotEmpty &&
+           _identityNumberController.text.trim().isNotEmpty;
+  }
+
+  // Username availability checking
+  final UsernameService _usernameService = UsernameService();
+  bool _isCheckingUsername = false;
+  bool? _isUsernameAvailable;
+  List<String> _usernameSuggestions = [];
+  String? _usernameError;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -94,6 +111,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     print('ProfileSetupScreen: Populating form with profile data...');
 
     // Set the text controllers with existing data
+    if (profile.username?.isNotEmpty == true) {
+      _usernameController.text = profile.username!;
+      print('ProfileSetupScreen: Loaded username: ${profile.username}');
+    }
+
     if (profile.shortBio?.isNotEmpty == true) {
       _shortBioController.text = profile.shortBio!;
       print('ProfileSetupScreen: Loaded bio: ${profile.shortBio}');
@@ -122,9 +144,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _shortBioController.dispose();
     _identityNumberController.dispose();
     _academicEmailController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -239,13 +263,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       ),
                     )
                     : TextButton(
-                      onPressed: _saveProfile,
+                      onPressed: _isFormValid ? _saveProfile : null,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
                         ),
-                        child: const Text(
+                        child: Text(
                           'Save',
                           style: TextStyle(
                             fontFamily: 'Poppins',
@@ -253,7 +277,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             fontStyle: FontStyle.normal,
                             fontSize: 14,
                             letterSpacing: -0.41,
-                            color: Color(0xff333333),
+                            color: _isFormValid 
+                                ? const Color(0xff333333)
+                                : Colors.grey[400],
                           ),
                         ),
                       ),
@@ -269,17 +295,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             children: [
               _buildProfileAvatar(),
               const SizedBox(height: 32),
+              _buildUsernameField(),
+              const SizedBox(height: 24),
               _buildTextField(
-                label: 'Short Bio',
+                label: 'Short Bio *',
                 controller: _shortBioController,
                 placeholder: 'Tell your friends about yourself',
                 maxLines: 3,
+                isRequired: true,
               ),
               const SizedBox(height: 24),
               _buildTextField(
-                label: 'Identity Number',
+                label: 'Identity Number *',
                 controller: _identityNumberController,
                 placeholder: 'Your student ID number',
+                isRequired: true,
               ),
               const SizedBox(height: 24),
               _buildTextField(
@@ -306,7 +336,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Widget _buildProfileAvatar() {
     final profile = _profileController.studentProfile.value;
-    
+
     return Center(
       child: Stack(
         children: [
@@ -326,11 +356,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         )
                         : profile?.profilePhotoUrl != null
                         ? DecorationImage(
-                          image: _isUrl(profile!.profilePhotoUrl)
-                              ? NetworkImage(profile.profilePhotoUrl!) as ImageProvider
-                              : MemoryImage(
-                                  _convertBase64ToImage(profile.profilePhotoUrl!),
-                                ),
+                          image:
+                              _isUrl(profile!.profilePhotoUrl)
+                                  ? NetworkImage(profile.profilePhotoUrl!)
+                                      as ImageProvider
+                                  : MemoryImage(
+                                    _convertBase64ToImage(
+                                      profile.profilePhotoUrl!,
+                                    ),
+                                  ),
                           fit: BoxFit.cover,
                         )
                         : null,
@@ -369,22 +403,199 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
+  Widget _buildUsernameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Username',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _usernameController,
+          style: const TextStyle(fontSize: 16),
+          decoration: InputDecoration(
+            hintText: 'Your unique username',
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
+            contentPadding: const EdgeInsets.only(bottom: 8, top: 4),
+            suffixIcon:
+                _isCheckingUsername
+                    ? const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF5796FF),
+                          ),
+                        ),
+                      ),
+                    )
+                    : _isUsernameAvailable == true
+                    ? const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 20,
+                    )
+                    : _isUsernameAvailable == false
+                    ? const Icon(Icons.cancel, color: Colors.red, size: 20)
+                    : null,
+            border: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color:
+                    _isUsernameAvailable == true
+                        ? Colors.green
+                        : _isUsernameAvailable == false
+                        ? Colors.red
+                        : Colors.grey[300]!,
+              ),
+            ),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color:
+                    _isUsernameAvailable == true
+                        ? Colors.green
+                        : _isUsernameAvailable == false
+                        ? Colors.red
+                        : Colors.grey[300]!,
+              ),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color:
+                    _isUsernameAvailable == true
+                        ? Colors.green
+                        : _isUsernameAvailable == false
+                        ? Colors.red
+                        : const Color(0xFF5796FF),
+                width: 2,
+              ),
+            ),
+            filled: false,
+            isDense: true,
+          ),
+          onChanged: _onUsernameChanged,
+        ),
+
+        // Username availability status
+        if (_isUsernameAvailable == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Username is available!',
+                  style: TextStyle(color: Colors.green, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+
+        if (_isUsernameAvailable == false && _usernameSuggestions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.cancel, color: Colors.red, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Username is not available',
+                      style: TextStyle(color: Colors.red, fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Suggestions:',
+                  style: TextStyle(
+                    color: const Color(0xFF666666),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children:
+                      _usernameSuggestions.take(5).map((suggestion) {
+                        return GestureDetector(
+                          onTap: () {
+                            _usernameController.text = suggestion;
+                            _onUsernameChanged(suggestion);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5796FF).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFF5796FF).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              suggestion,
+                              style: TextStyle(
+                                color: const Color(0xFF5796FF),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     required String placeholder,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    bool isRequired = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+        RichText(
+          text: TextSpan(
+            text: label.replaceAll(' *', ''),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+            children: isRequired
+                ? [
+                    const TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ]
+                : [],
           ),
         ),
         const SizedBox(height: 8),
@@ -409,7 +620,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             focusedBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: Color(0xFF5796FF), width: 2),
             ),
-            // Remove box shadow and background
             filled: false,
             isDense: maxLines == 1,
           ),
@@ -618,6 +828,68 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     }
   }
 
+  void _onUsernameChanged(String value) {
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+
+    // Reset states
+    setState(() {
+      _isUsernameAvailable = null;
+      _usernameSuggestions.clear();
+      _usernameError = null;
+      _isFormChanged = true;
+    });
+
+    // Don't check if username is too short or empty
+    if (value.trim().isEmpty || value.trim().length < 3) {
+      return;
+    }
+
+    // Debounce the API call
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+      _checkUsernameAvailability(value.trim());
+    });
+  }
+
+  Future<void> _checkUsernameAvailability(String username) async {
+    if (username.isEmpty || username.length < 3) return;
+
+    setState(() {
+      _isCheckingUsername = true;
+      _usernameError = null;
+    });
+
+    try {
+      final result = await _usernameService.checkUsernameAvailability(username);
+
+      if (mounted) {
+        setState(() {
+          _isUsernameAvailable = result['data']['isAvailable'] as bool;
+          if (!_isUsernameAvailable!) {
+            _usernameSuggestions = List<String>.from(
+              result['data']['suggestions'] ?? [],
+            );
+          } else {
+            _usernameSuggestions.clear();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isUsernameAvailable = false;
+          _usernameError = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingUsername = false;
+        });
+      }
+    }
+  }
+
   Future<void> _saveProfile() async {
     print('Save button clicked');
 
@@ -704,9 +976,49 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         print('ProfileSetupScreen: ID card URL: $idCardUrl');
       }
 
-      // Try updating/creating profile using the new API with image URLs
+      // Check if username is provided and update it using the new username endpoint
+      bool usernameSuccess = true;
+      if (_usernameController.text.trim().isNotEmpty) {
+        // Check if username is available before proceeding
+        if (_isUsernameAvailable != true) {
+          throw Exception('Please choose an available username');
+        }
+
+        print('Username provided, setting username...');
+        final usernameService = UsernameService();
+
+        try {
+          final setUsernameResult = await usernameService.setUsername(
+            _usernameController.text.trim(),
+          );
+
+          // Check if username was successfully set
+          if (setUsernameResult['success'] != true) {
+            // Username is no longer available, update suggestions
+            final suggestions = List<String>.from(
+              setUsernameResult['data']['suggestions'] ?? [],
+            );
+            setState(() {
+              _isUsernameAvailable = false;
+              _usernameSuggestions = suggestions;
+            });
+            throw Exception(
+              setUsernameResult['message'] ?? 'Username is no longer available',
+            );
+          }
+
+          usernameSuccess = true;
+          print('Username update success: $usernameSuccess');
+        } catch (e) {
+          print('Username update failed: $e');
+          usernameSuccess = false;
+          throw e; // Re-throw to be caught by outer try-catch
+        }
+      }
+
+      // Update other profile fields (excluding username)
       print('Attempting to save profile with new API...');
-      success = await _profileController.updateProfileWithNewAPI(
+      bool profileSuccess = await _profileController.updateProfileWithNewAPI(
         shortBio:
             _shortBioController.text.isNotEmpty
                 ? _shortBioController.text
@@ -722,6 +1034,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         profileImageUrl: profilePhotoUrl,
         idCardUrl: idCardUrl,
       );
+
+      success = usernameSuccess && profileSuccess;
 
       // Close loading dialog
       Get.back();

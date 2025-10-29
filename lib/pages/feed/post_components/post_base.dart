@@ -129,6 +129,7 @@ class _PostBaseState extends State<PostBase> {
                 Row(
                   children: [
                     Flexible(
+                      flex: 2,
                       child: Text(
                         post.userName,
                         style: TextStyle(
@@ -140,21 +141,25 @@ class _PostBaseState extends State<PostBase> {
                           color: Color(0xff333333),
                         ),
                         overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
-                    const SizedBox(width: 8.0),
+                    const SizedBox(width: 4.0),
                     Flexible(
+                      flex: 1,
                       child: Text(
-                        post.userHandle,
+                        '@${post.userHandle}' ,
                         style: TextStyle(
                           fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w500,
+                          fontWeight:
+                              FontWeight.w400, // Make handle lighter weight
                           fontStyle: FontStyle.normal,
                           fontSize: 12.0,
                           letterSpacing: 0.0,
-                          color: Color(0xff333333),
+                          color: Color(0xff666666), // Make handle lighter color
                         ),
                         overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ],

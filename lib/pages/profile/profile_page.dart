@@ -9,6 +9,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'edit_profile_page.dart';
 import '../../widgets/profile_photo_viewer.dart';
 import '../feed/post_components/post_base.dart';
+import '../feed/post_components/text_post.dart';
+import '../feed/post_components/image_post.dart';
+import '../feed/post_components/link_post.dart';
+import '../../models/post_model.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -398,7 +402,7 @@ class _ProfilePageState extends State<ProfilePage>
                                 fit: BoxFit.cover,
                               )
                               : const DecorationImage(
-                                image: AssetImage('assets/images/Group 13.png'),
+                                image: AssetImage('assets/images/Group 13'),
                                 fit: BoxFit.cover,
                               ),
                     ),
@@ -445,13 +449,14 @@ class _ProfilePageState extends State<ProfilePage>
               ),
               SizedBox(width: 4),
               Text(
-                '@${profile?.email.split('@').first ?? 'Anonymous'}',
+                '@${profile?.username ?? profile?.fullName?.toLowerCase().replaceAll(' ', '') ?? 'user'}',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                   fontStyle: FontStyle.normal,
                   letterSpacing: -0.41,
+                  color: Color(0xFF666666),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -700,7 +705,7 @@ class _ProfilePageState extends State<ProfilePage>
           ...postsToShow.map(
             (post) => Padding(
               padding: const EdgeInsets.only(bottom: 16.0),
-              child: PostBase(post: post),
+              child: _buildPostByType(post),
             ),
           ),
           // "See More" button
@@ -1011,5 +1016,17 @@ class _ProfilePageState extends State<ProfilePage>
         ],
       ),
     );
+  }
+
+  // Build post widget based on post type
+  Widget _buildPostByType(PostModel post) {
+    switch (post.type) {
+      case PostType.text:
+        return TextPost(post: post);
+      case PostType.image:
+        return ImagePost(post: post);
+      case PostType.link:
+        return LinkPost(post: post);
+    }
   }
 }

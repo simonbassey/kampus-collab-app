@@ -39,28 +39,16 @@ class _CreateAccountOtpScreenState extends State<CreateAccountOtpScreen> {
       // Store the email in the controller for further API calls
       _authController.currentEmail.value = _email!;
 
-      // Automatically trigger OTP resend for unverified accounts coming from login
+      // Show info message that OTP has been sent (backend sends it automatically)
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Trigger OTP resend and show notification
-        _authController.resendOtp().then((success) {
-          String message =
-              success
-                  ? 'A verification code has been sent to your email'
-                  : ErrorMessageHelper.cleanErrorMessage(
-                    _authController.errorMessage.value.isNotEmpty
-                        ? _authController.errorMessage.value
-                        : 'Failed to send verification code. Try using the resend button.',
-                  );
-
-          Get.snackbar(
-            success ? 'Code Sent' : 'Error',
-            message,
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: success ? Colors.blue[100] : Colors.red[100],
-            colorText: success ? Colors.blue[900] : Colors.red[900],
-            margin: const EdgeInsets.all(16),
-          );
-        });
+        Get.snackbar(
+          'Code Sent',
+          'A verification code has been sent to your email',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.blue[100],
+          colorText: Colors.blue[900],
+          margin: const EdgeInsets.all(16),
+        );
       });
     }
 

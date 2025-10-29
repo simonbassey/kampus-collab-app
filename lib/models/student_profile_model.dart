@@ -2,6 +2,7 @@ class StudentProfileModel {
   final int? id;
   final String? userId;
   final String? fullName;
+  final String? username;
   final String email;
   final String? profilePhotoUrl;
   final String? shortBio;
@@ -23,6 +24,7 @@ class StudentProfileModel {
     this.id,
     this.userId,
     this.fullName,
+    this.username,
     this.email = '',
     this.profilePhotoUrl,
     this.shortBio,
@@ -47,6 +49,7 @@ class StudentProfileModel {
       id: json['id'],
       userId: json['userId'],
       fullName: json['fullName'],
+      username: json['username'],
       email: json['email'] ?? '',
       profilePhotoUrl: json['profilePhotoUrl'],
       shortBio: json['shortBio'],

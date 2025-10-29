@@ -89,6 +89,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       );
 
       if (success) {
+        // Show success message since backend automatically sends OTP
+        Get.snackbar(
+          'Account Created',
+          'Account created successfully! Please check your email for the verification code.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          margin: const EdgeInsets.all(16),
+        );
+
         // Navigate to account creation OTP verification
         Get.toNamed(
           '/create-account-otp',

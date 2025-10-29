@@ -708,20 +708,15 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
   String _getUserHandle(StudentProfileModel? profile) {
     if (profile == null) return '@user';
 
-    // Try to create a handle from the email first
-    if (profile.email.isNotEmpty) {
-      // Extract username part from email (before the @)
-      final username = profile.email.split('@').first;
-      return '@$username';
+    // Use the username field if available
+    if (profile.username != null && profile.username!.isNotEmpty) {
+      return '@${profile.username}';
     }
 
-    // Fallback to using the full name if email is not available
+    // Fallback to using the full name
     if (profile.fullName != null && profile.fullName!.isNotEmpty) {
-      // Remove spaces and take first 10 chars
-      String nameBased = profile.fullName!.replaceAll(' ', '');
-      if (nameBased.length > 10) {
-        nameBased = nameBased.substring(0, 10);
-      }
+      // Remove spaces and convert to lowercase
+      String nameBased = profile.fullName!.toLowerCase().replaceAll(' ', '');
       return '@$nameBased';
     }
 
