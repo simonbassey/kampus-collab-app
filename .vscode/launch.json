@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Local (iOS Simulator)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define=API_BASE_URL=http://localhost:5001"]
+    },
+    {
+      "name": "Local (Android Emulator)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define=API_BASE_URL=http://10.0.2.2:5001"]
+    },
+    {
+      "name": "Remote Dev (Azure)",
+      "request": "launch",
+      "type": "dart"
+    }
+  ]
+}

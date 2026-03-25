@@ -1,14 +1,17 @@
 /// API Constants for Kampus Collab Application
 ///
-/// This file contains all API endpoints and configuration used throughout the application.
-/// For local development, you can modify the baseUrl to point to your local server:
-/// ```
-/// static const String baseUrl = 'http://localhost:3000';
-/// ```
+/// To run against your local dev server, launch with:
+///   flutter run --dart-define=API_BASE_URL=http://localhost:5000
+///
+/// For Android emulator use http://10.0.2.2:5000 instead of localhost.
+/// Without --dart-define, the remote Azure server is used.
 class ApiConstants {
-  // Base API URL
-  static const String baseUrl =
-      'https://kampus-colab-cdgdg9gec3g7b0bb.canadacentral-01.azurewebsites.net';
+  // Base API URL — override with --dart-define=API_BASE_URL=http://localhost:5000
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue:
+        'https://kampus-colab-cdgdg9gec3g7b0bb.canadacentral-01.azurewebsites.net',
+  );
   static const String apiPrefix = '$baseUrl/api';
 
   // Auth endpoints
