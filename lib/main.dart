@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'firebase_options.dart';
 import 'routes/app_pages.dart';
 import 'bindings/app_binding.dart';
+import 'services/notifications/fcm_service.dart';
 import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await FCMService.initialize();
 
   // Initialize Supabase
   try {
