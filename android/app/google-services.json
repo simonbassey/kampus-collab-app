@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "715684860286",
+    "project_id": "kampus-collab",
+    "storage_bucket": "kampus-collab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:715684860286:android:263433e34d253653e9232f",
+        "android_client_info": {
+          "package_name": "com.example.inkstryq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBgzKD90mRMFYkRGsMoMs44hF-_KY0Tk7M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

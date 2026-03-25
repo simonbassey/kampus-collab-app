@@ -45,6 +45,8 @@
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>
     <key>NSCameraUsageDescription</key>
     <string>This app needs access to camera to take profile photos and upload student ID</string>
     <key>NSPhotoLibraryUsageDescription</key>
